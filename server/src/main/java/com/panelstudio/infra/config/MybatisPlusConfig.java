@@ -28,8 +28,11 @@ public class MybatisPlusConfig {
         return new MetaObjectHandler() {
             @Override
             public void insertFill(MetaObject metaObject) {
-                strictInsertFill(metaObject, "createdAt", String.class, Timestamps.now());
-                strictInsertFill(metaObject, "updatedAt", String.class, Timestamps.now());
+                String now = Timestamps.now();
+                strictInsertFill(metaObject, "createdAt", String.class, now);
+                strictInsertFill(metaObject, "updatedAt", String.class, now);
+                // discussion_participants 用 joined_at 记录参与时间
+                strictInsertFill(metaObject, "joinedAt", String.class, now);
             }
 
             @Override
