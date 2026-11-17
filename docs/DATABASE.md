@@ -53,7 +53,8 @@ spring:
     baseline-on-migrate: true
 ```
 
-> 说明：`journal_mode` 等参数由 xerial `sqlite-jdbc` 从 URL 解析并写入 `SQLiteConfig`；`connection-init-sql` 是双保险（连接池复用时确保外键开启）。Flyway 11 的 SQLite 支持已模块化，`pom.xml` 需显式引入 `flyway-database-sqlite`（版本由 Spring Boot 3.5.16 的 dependencyManagement 托管）。
+> 说明：`journal_mode` 等参数由 xerial `sqlite-jdbc` 从 URL 解析并写入 `SQLiteConfig`；`connection-init-sql` 是双保险（连接池复用时确保外键开启）。
+> Flyway 11 的 SQLite 方言**仍在 `flyway-core` 内**（jar 内含 `org/flywaydb/core/internal/database/sqlite/`），Maven Central 上并不存在 `org.flywaydb:flyway-database-sqlite` 这个 artifact，因此 `pom.xml` 只依赖 `flyway-core`（版本由 Spring Boot 3.5.16 的 dependencyManagement 托管）。
 
 ---
 

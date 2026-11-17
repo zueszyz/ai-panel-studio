@@ -349,6 +349,8 @@ sse.on('message.delta', ({ messageId, seq, text }) => {
 | 429 | `LLM_RATE_LIMIT` / `REGEN_LIMIT` | 限流 / 重生成次数上限 | 是（退避） |
 | 504 | `LLM_TIMEOUT` | 模型超时 | 是（单条重试） |
 | 502 | `LLM_JSON_INVALID` / `LLM_UPSTREAM_ERROR` | 上游异常/输出不可解析 | 是 |
+| 409 | `DISCUSSION_STATE_INVALID` | 状态机拒绝的迁移（附带 `from` / `to`） | 否 |
+| 500 | `INTERNAL_ERROR` | 未预期异常（不回传堆栈与上游响应体） | 是（稍后） |
 
 统一错误体：
 

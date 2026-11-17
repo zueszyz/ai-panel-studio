@@ -27,7 +27,7 @@
 
 | 阶段 | 记录数 | AI 参与度 | 主要产出 |
 | --- | --- | --- | --- |
-| M1 骨架 | — | — | — |
+| M1 骨架 | 1（R-014） | `[ai-gen+edit]` | Maven 工程、Flyway 7 表、异常/日志、health、Vue 壳、脚本 |
 | M2 组局 | — | — | — |
 | M3 讨论 | — | — | — |
 | M4 收敛 | — | — | — |
@@ -217,6 +217,31 @@
   4. **只写可执行条款**：全篇用"必须/禁止"，不用"建议/尽量"——模糊词等于没有约束。
 - **验证**：逐条对照 PRD FR-1~FR-9、API 17 接口、DATABASE 7 表检查覆盖；`grep -n "建议\|尽量" rules/` 应为空（已确认）。
 - **结论**：后续每个模块开工先读 `AGENTS.md` + 对应 rules，完成时按 `rules/50` §4 的 DoD 模板打勾，再提交。
+
+### R-014 · M1 骨架落地（2026-11-17 19:00–19:40）
+
+- **阶段**：M1（骨架）
+- **触发**：人工要求「根据相关文档与项目计划，开始实现 M1 和 M2，每个模块自检通过后再做下一个」
+- **目标**：把 `mvn spring-boot:run` + `pnpm dev` 的骨架跑通：7 张表自动建库、统一异常/JSON 日志、health/metrics、Vue 壳与设计令牌
+- **Prompt（摘要）**：> 按 `rules/50` 的模块顺序推进 M1：先读 PRD FR + API + DATABASE + rules，再依次落地 Maven 工程、Flyway 迁移、统一异常与 MDC 日志、health/metrics、Vue 骨架与设计令牌、脚本与 E2E 脚手架；每个模块跑测试与冒烟后再提交。
+- **产出**：
+  - `server/pom.xml`、`application.yml` / `application-test.yml` / `logback-spring.xml`；
+  - `db/migration/V1__schema.sql`（7 表）/ `V2__indexes.sql` / `V3__seed_demo.sql`（1 场已结束圆桌：4 席位 / 12 消息 / 1 纪要 / 8 轨迹）；
+  - `api/advice`（统一错误体与错误码）、`infra/logging`（TraceIdFilter + MdcTaskDecorator）、`infra/config`（AppProperties / AsyncConfig / MybatisPlusConfig / WebConfig / OpenApiConfig）、`ApiHealthController` + `HealthService` + `MetricsService`；
+  - `web/`（Vite 5 + Vue 3.4 + Router 4 + Pinia 2，`tokens.css` / `base.css` / `app.css`、`lib/copy.ts` 中文文案层、`lib/api.ts` 匿名身份）；
+  - `scripts/dev|build`（sh + bat，无容器）、`e2e/` Playwright 脚手架。
+- **人工决策点** `[me]`：
+  1. **`flyway-database-sqlite` 不存在**：核对 `flyway-core:11.7.2` jar 内含 `org/flywaydb/core/internal/database/sqlite/`，改为只依赖 `flyway-core`，并回改 DATABASE.md 的说明（文档与实现冲突时以可验证事实为准）；
+  2. **MyBatis-Plus 3.5.9+ 拆分**：`PaginationInnerInterceptor` 需 `mybatis-plus-jsqlparser`，显式加依赖并注释理由（不是引入第二个 ORM）；
+  3. **JSON 日志只在非 dev profile 开**：dev/test 用可读 pattern，prod/e2e 用 logstash encoder（MDC 字段固定），避免开发期日志不可读；
+  4. **SPA 兜底放后端**：`SpaForwardController` 只转发 3 条前端路由，保证 `java -jar` 单进程刷新不 404。
+- **验证方式（命令 + 结果）**：
+  - `mvn -B test` → `Tests run: 11, Failures: 0, Errors: 0`（ULID 单调 2000 次、状态机 4 例、health/metrics/7 表集成 4 例）；
+  - `java -jar server/target/panel-studio.jar` → 日志 `Successfully applied 3 migrations … now at version v3`，`/api/health` 返回 `{"status":"ok","db":"up","llm":"down","uptimeSec":9}`，`/actuator/health` 三组件 UP；
+  - `pnpm -C web run build` → `vue-tsc --noEmit` 通过 + `✓ built in 2.38s`；`pnpm -C web run lint` → 0 error；
+  - `scripts/build.bat` → jar 内置静态资源；`/`、`/discussions/dk_1`、`/discussions/dk_1/panel` 均 200（text/html），`/api/health` 200；
+  - 开发模式：Vite 5179 + `/api` 代理 → 页面 200、`/api/health` 200。
+- **结论**：M1 门禁达成。遗留：`flyway-database-sqlite` 的文档描述已修正；生产 JSON 日志待 M5 压测时取样验证。
 
 ---
 
