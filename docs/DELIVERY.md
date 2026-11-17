@@ -2,43 +2,64 @@
 
 | 项 | 内容 |
 | --- | --- |
-| 用途 | 把作业要求逐项落到"谁、在哪、怎么证明"，避免交付时漏项 |
-| 关联 | [PRD](PRD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [DATABASE](DATABASE.md) · [API](API.md) · [TESTING](TESTING.md) · [计划](PROJECT_PLAN.md) |
-| 截止 | 收到作业后 72 小时内（建议留 6 小时缓冲用于打包与录屏） |
-| 提交邮箱 | handshake@gaodun.cn |
+| 依据版本 | **现行版作业说明（演播厅版）**：数据库 SQLite、前后端框架不限、交付物为「源码 + Prompt 记录 + 工作流程说明」 |
+| 用途 | 把"重要规则 5 条 / 交付物 3 项 / 提交方式"逐条落到"在哪、怎么证明" |
+| 关联 | [PRD](PRD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [DATABASE](DATABASE.md) · [API](API.md) · [TESTING](TESTING.md) · [PROMPT_LOG](PROMPT_LOG.md) · [WORKFLOW](WORKFLOW.md) · [UI 决策](UI_ADR.md) |
+| 提交邮箱 | **xulei@wisqwest.com** |
+| 邮件主题 | **【远程作业提交】姓名** |
+| 附件 | zip 包 + 文档（Prompt 记录 + 工作流程说明）+ GitHub/Gitee 仓库邀请 |
+| 截止 | **收到作业后 72 小时** |
+
+> 说明：作业说明存在多个版本（措辞差异见 §7）。本文档以**现行演播厅版**为准；旧版要求（如"严禁 UI 组件库""≥30 次 commit""3–5 分钟视频"）中**不与本版冲突的部分**仍作为加分项保留，冲突部分已按本版修正。
 
 ---
 
-## 1. 必交清单（逐项对照）
+## 1. 重要规则 5 条（逐条对照）
 
-作业「附件约束（硬性要求）」共 11 项，逐项落到本项目：
-
-| # | 作业要求 | 本项目的落地 | 证据位置 | 状态 |
-| --- | --- | --- | --- | --- |
-| 1 | 完整可运行：README 说明 + 命令 + **数据库初始化脚本** + ≥5 张表 | Flyway `V1__schema.sql`（7 表）+ `V2__indexes.sql` + `V3__seed_demo.sql`，启动即迁移；`scripts/dev` 一条命令 | `server/src/main/resources/db/migration/` | 待编码 |
-| 2 | 前端 ≥3 页面路由（讨论列表 / 讨论详情 / 复盘总结） | **4 条**：`/`、`/discussions/:id/panel`、`/discussions/:id`、`/discussions/:id/minutes` | PRD §7 | 待编码 |
-| 3 | 后端 ≥8 个 API（讨论 CRUD / 消息 / SSE 流式 / 汇总） | **17 个**（REST 14 + SSE 3） | API §1 | 待编码 |
-| 4 | ≥3 条端到端（E2E）测试 | **5 条**（3 条必过 + 2 条降级/断线加分） | TESTING §2 | 待编码 |
-| 5 | 文档：README + 架构图 + API 文档 + 数据库设计（ER 图） | 8 份文档，含 Mermaid 架构图、状态机、ER 图、SSE 时序图 | `docs/` | ✅ 已完成 |
-| 6 | Git ≥30 次 commit，递增可追溯、message 有意义 | 规划 53 条，按"一次一件事"切分 | PROJECT_PLAN §3 | 进行中（17/30+） |
-| 7 | 过程留痕：保留每次 Prompt / 工具调用记录，README 说明哪些是 AI 生成、哪些自己写、改了哪些 | `PROMPT_LOG.md` 11 条记录（含技术栈变更决策）+ README §7 声明表 | `docs/PROMPT_LOG.md`、README §7 | 持续追加 |
-| 8 | 交付物 1：源码（统一压缩包，与文档同主目录）+ 文档 + Git 仓库（含提交历史） | 见 §3 打包结构；附 `git-history.txt` | §3 | 待打包 |
-| 9 | 交付物 2：3–5 分钟视频（走查 + 讲解） | 分镜见 §4（4 分 30 秒） | §4 | 待录制 |
-| 10 | 交付物 3：README（运行说明 + 架构说明 + AI 工具使用说明） | README §5 / §3 / §7 | `README.md` | ✅ 已完成 |
-| 11 | 提交方式：邮件（简历 + 作品链接 + 视频链接 + 说明） | 模板见 §5 | §5 | 待发送 |
-
----
-
-## 2. 与作业描述的差异（必须主动说明，不要藏）
-
-| 项 | 作业原文 | 本项目 | 为什么 |
+| # | 原文要点 | 本项目的做法 | 证据 |
 | --- | --- | --- | --- |
-| 后端语言 | "后端基于 Node.js 生态环境和 TypeScript（推荐）实现" | **Spring Boot 3.5.16 + JDK 17** | "推荐"非强制；三个考核点（多 Agent 调度、并行流式、错误隔离）与语言无关，且在 JDK 17 无虚拟线程的前提下实现，约束更显式、更能体现工程判断。SSE 用 Spring MVC `SseEmitter`，与前端的契约完全一致 |
-| 数据库 | 未指定 | **SQLite 3.40+（WAL）** | 单文件零运维，评审 `java -jar` 即可复现；代价（单写者）已在 DATABASE §1.2 明确并以短事务 + 退避重试化解 |
-| 一键启动 | 提到 "Docker Compose 一键起来" | **本地脚本 + 单个 jar**（按要求不使用容器） | SQLite 无独立服务，容器只会多一层流式代理（`proxy_buffering`）风险；`scripts/dev` 两条命令即可复现，`java -jar` 一条命令演示 |
-| 表 / 接口 / 路由 / 测试数量 | ≥5 表、≥8 API、≥3 路由、≥3 E2E | 7 表、17 API、4 路由、5 E2E | 只多不少，且每一项都有验收标准（PRD 每条 FR 带 checklist） |
+| 1 | **禁止"一键生成"**：严禁用单一 Prompt 直接生成整个项目代码，必须体现工程化拆解 | 按"文档 → 骨架 → 组局 → 讨论 → 收敛 → 质量"六段推进，每段独立 Prompt + 人工评审；13 次关键交互与 7 次走偏修正留痕 | [PROMPT_LOG](PROMPT_LOG.md) |
+| 2 | **技术栈**：数据库采用 SQLite；前端及后端框架不限 | SQLite 3.40（WAL）+ MyBatis-Plus + Flyway；Spring Boot 3.5.16 / JDK 17；Vue 3.4（UI 手写） | README §3、[DATABASE](DATABASE.md) |
+| 3 | **原创性**：必须从 0 到 1 创建 | 仓库从空目录初始化，无脚手架模板套用；UI 不使用任何组件库，设计与样式自建 | `git log` 首条为 `chore: init repo` |
+| 4 | **工具限制**：主体开发必须使用某一款 Vibe Coding 工具，不能使用浏览器与 AI 的对话 | 全程在 CodeBuddy（终端/IDE 内 Agent）完成；无网页版对话产物 | PROMPT_LOG §7 工具调用记录 |
+| 5 | **利用 AI 工具**：鼓励使用 skills、MCP 优化流程 | 使用文件读写/命令执行/截图裁剪等工具链；结构化产出（md + mermaid）由工具直接落盘，减少复制粘贴损耗 | PROMPT_LOG §7 |
 
-> 这四条差异会同时出现在 README「与作业原文的差异」一节，确保评审第一眼就能看到，而不是自己去发现。
+---
+
+## 2. 交付物三项（缺一项视为不合格）
+
+### 2.1 完整项目源码（GitHub/Gitee 链接）
+
+| 要求 | 本项目落地 | 状态 |
+| --- | --- | --- |
+| 代码 + **数据库初始化脚本** | Flyway `V1__schema.sql`（7 表）/ `V2__indexes.sql` / `V3__seed_demo.sql`，启动即迁移 | ✅ 脚本已设计，待编码 |
+| **≥5 条高质量样例数据**（预设讨论话题 + 对应嘉宾阵容） | `V4__seed_demo.sql` 提供 **5 场**预设圆桌：AI 技术选型 / 定价策略 / 招聘取舍 / 内容策略 / 组织调整，每场含 4 席位（1 主持 + 3 专家，立场互补）+ 开场消息 | 待编码 |
+| **开发文档**（PRD、ER 图等，md + mermaid） | 9 份 md，含分层架构图、回合调度时序图、SSE 多路复用图、ER 图、状态机图 | ✅ |
+| **API 文档** | springdoc-openapi → `/swagger-ui.html`；手写契约 [API.md](API.md)（17 接口 + 13 类 SSE 事件 + 错误码） | ✅ 契约完成 |
+| **测试代码** | JUnit 5 单测 + MockMvc 集成（I-1~I-15）+ Playwright E2E（5 条） | 待编码 |
+| **README** 含：运行指南 / 环境变量配置 / 技术选型说明 / API 列表 / 已完成能力与后续改进方向 | README §5 运行、`.env.example` 环境变量、§3 选型、§6 API 索引、§8 差异；「已完成 / 后续改进」见 §2.4 | ✅ 主体完成 |
+| **Git 提交历史呈层级演进**（如 `docs/schema → ui-components → tests → feat: logic`） | 提交按 `docs → chore → feat(db) → feat(server) → feat(web) → test → fix` 分层推进，共 27 次（规划 53 次） | 进行中 |
+
+### 2.2 核心 Prompt 记录文档（必须 ≥5 段，四范式齐全）
+
+| 要求 | 落点 |
+| --- | --- |
+| 原始核心 Prompt | PROMPT_LOG R-001（需求拆解）、R-003（并发模型）为原始 Prompt 骨架 |
+| **SDD 阶段**：数据建模与 API 契约生成 | R-004（ER/7 表）、R-005（API/SSE 契约）、R-008（SQLite 重设计） |
+| **DDD 阶段**：前端组件与页面生成 | R-012（UI 方案）、R-013（中文 UI 与界面规范）、ADR-001 §6 |
+| **TDD 阶段**：核心逻辑测试用例编写与业务实现 | R-006（E2E/集成用例设计）、TESTING §4（单测清单先于实现） |
+| **E2E 阶段**：端到端测试与质量闭环 | TESTING §2（5 条 E2E）、§7 交付前自检 |
+| 每段 Prompt 后 1–2 句说明（当时意图 / 遇到的挑战 / 如何引导修正） | 每条记录的「目标 + 人工干预 + 结论」三行即为该说明；四范式归组表见 PROMPT_LOG §4.1 |
+
+### 2.3 开发过程思路 & 工作流程说明（1–1.5 页）
+
+独立文档 [WORKFLOW.md](WORKFLOW.md)，含：开发流程（六段 + 每段输入输出）、工具与模型使用方式、与 AI 协作中的 3 个典型问题及解决路径、对"工程化 AI 开发"的理解、效率台账（人工估算 40h → 实际 17h）。
+
+### 2.4 README 必含的「已完成能力 / 后续改进方向」
+
+| 已完成 | 后续改进 |
+| --- | --- |
+| 圆桌大厅、组局（席位流式生成）、认领席位、多轮并行讨论、轨迹面板、观点溯源、六段纪要落库 | 多用户同场围观（presence 广播）；账号体系；纪要二次校验（引用有效性）；FTS5 trigram 搜索；单机 → 多实例（Actor 迁 Redis） |
 
 ---
 
@@ -46,105 +67,108 @@
 
 ```text
 ai-panel-studio/                     ← 压缩包根目录（源码与文档同主目录）
-├── README.md                        ← 运行 / 架构 / AI 使用说明（交付物 3）
+├── README.md                        ← 运行指南 / 环境变量 / 技术选型 / API 列表 / 已完成与改进
 ├── docs/
 │   ├── PRD.md  ARCHITECTURE.md  DATABASE.md  API.md
-│   ├── TESTING.md  PROJECT_PLAN.md  PROMPT_LOG.md  DELIVERY.md
-│   └── git-history.txt              ← git log --pretty 导出（补足"含提交历史"）
-├── server/                          ← Spring Boot 3.5.16（Maven，含 Flyway 脚本）
-├── web/                             ← Vue 3 + TS（构建产物 dist 会复制进 server 静态目录）
-├── e2e/                             ← Playwright 用例与配置
-├── scripts/                         ← dev.sh/dev.bat · build.sh/build.bat（无容器）
+│   ├── TESTING.md  PROJECT_PLAN.md  PROMPT_LOG.md  DELIVERY.md  UI_ADR.md  WORKFLOW.md
+│   ├── assets/notice-rules.png      ← 作业要求截图（依据留档）
+│   └── screenshots/                 ← 3 张核心页面截图（列表 / 圆桌 / 纪要）
+├── server/                          ← Spring Boot 3.5.16（含 Flyway 脚本，含 5 场样例数据）
+├── web/                             ← Vue 3 + TS（手写 UI）
+├── e2e/                             ← Playwright
+├── scripts/                         ← dev / build（无容器）
 ├── .env.example
-└── .git/                            ← 建议一并打包（体积小，能直接 git log 验证）
+└── .git/
 ```
-
-打包命令：
 
 ```bash
 git log --pretty=format:'%h %ad %s' --date=short > docs/git-history.txt
-zip -r ai-panel-studio.zip . -x "*/node_modules/*" "*/target/*" "data/*" ".git/objects/pack/*.tmp"
+zip -r ai-panel-studio.zip . -x "*/node_modules/*" "*/target/*" "data/*"
 ```
 
-- **不要**打包 `node_modules/`、`server/target/`、`data/*.db`（数据文件含演示数据，体积小但可复现，改由 Flyway seed 生成）。
-- 压缩包命名：`AI开发实习生-姓名-AI圆桌讨论MVP.zip`。
+- 仓库需给评审开通访问（GitHub/Gitee 邀请链接）；压缩包仅作备份，**以仓库为准**。
+- 压缩包命名：`远程作业-AI圆桌演播厅-姓名.zip`。
 
 ---
 
-## 4. 演示视频分镜（4 分 30 秒）
+## 4. 演示视频（旧版要求，保留为加分项）
 
-| 时间 | 画面 | 讲解要点（口播） |
+现行说明未强制视频，但旧版要求"3–5 分钟讲解 + 演示"。仍建议录一条，内容按旧版三段：代码结构讲解 / 核心功能演示 / Agent 协作模式讲解。分镜沿用原稿：
+
+| 时间 | 画面 | 要点 |
 | --- | --- | --- |
-| 0:00–0:25 | 标题 + 一句定位 | "AI Panel Studio：输入议题，召集一场你可以插话的 AI 圆桌。它解决的不是答案不够好，而是答案太单一。" |
-| 0:25–1:10 | 大厅 → 发起 → 席位逐个浮现 | 议题「该不该把推荐系统换成向量召回」，4 人局；指出"1 主持 + 3 专家，立场互补，不是四个万能助手" |
-| 1:10–1:50 | 认领席位 → 主持人开场 | 三色区分（琥珀/青碧/靛蓝 + 主持人中性色）；"我坐技术专家这位，接下来我说话就代表他" |
-| 1:50–2:50 | 用户插话 → **两路同时流式** | 关键镜头：两个气泡同时吐字，"注意这里不是排队，A 卡住了 B 照样出"；切轨迹面板看"谁在思考、谁在说、谁在等"；点引用徽标跳回原文 |
-| 2:50–3:30 | 结束 → 六段纪要 → 溯源 → 刷新 | "纪要不是 AI 单独生成的总结，每条主张都能点回原话"；**刷新页面**证明来自 SQLite 而非前端缓存 |
-| 3:30–4:15 | 代码走查（IDE 全景） | 分层（api/application/orchestrator/domain/infra）→ `SessionActor` + `Semaphore` → `SseEmitter` 多路复用 → Flyway 7 表 → 3 条 E2E 绿灯 |
-| 4:15–4:30 | 收尾 | 取舍与边界："SQLite 单写者用短事务兜；没做多人围观；不用容器，`java -jar` 就能跑" |
-
-录制建议：1080p、终端字号 ≥16；**不要**快进流式过程（并行流式是本项目的核心证据）；提前把 seed 数据准备好，避免现场建库等待。
+| 0:00–0:20 | 标题 + 定位 | "解决的不是答案不够好，而是答案太单一" |
+| 0:20–1:00 | 大厅 → 发起 → 席位浮现 | 1 主持 + 3 专家，立场互补 |
+| 1:00–1:30 | 认领席位 → 主持人开场 | 三色区分；"我坐技术专家这位" |
+| 1:30–2:30 | 插话 → **两路同时流式** | 必拍：A 慢不挡 B；轨迹面板；引用跳转 |
+| 2:30–3:00 | Agent 协作讲解 | 立场注入 → 选人策略 → 并行 + 信号量 → 失败隔离 |
+| 3:00–3:30 | 结束 → 六段纪要 → 刷新 | 纪要可溯源、落库可复盘 |
+| 3:30–4:15 | 代码结构 | 五层分包 → SessionActor → SseRegistry → Flyway → E2E |
+| 4:15–4:40 | 收尾 | 取舍与边界（SQLite 单写者、无容器、未做多人围观） |
 
 ---
 
 ## 5. 提交邮件模板
 
 ```text
-收件人：handshake@gaodun.cn
-主题：【AI开发实习生-张三-后端开发】
+收件人：xulei@wisqwest.com
+主题：【远程作业提交】张三
 
 正文：
 您好，
 
-附件为本次 AI 圆桌讨论 Web App MVP 的作业提交：
+附件为「AI 圆桌演播厅 MVP」远程作业提交：
 
-1. 简历：见附件
-2. 源码 / 文档：<仓库或网盘链接>（压缩包内 docs/git-history.txt 为提交历史导出，共 N 次提交）
-3. 演示视频：<视频链接，4 分 30 秒>
+1. 源码仓库：<GitHub/Gitee 链接>（已邀请访问；提交历史见 docs/git-history.txt，共 N 次）
+2. 压缩包：见附件（含代码、数据库初始化脚本、5 场样例数据、文档、测试）
+3. 核心 Prompt 记录：docs/PROMPT_LOG.md（13 段，覆盖 SDD / DDD / TDD / E2E 四范式）
+4. 工作流程说明：docs/WORKFLOW.md（1.5 页，含 3 个典型问题与效率台账）
 
-技术栈：Spring Boot 3.5.16 + JDK 17 + Vue 3 + SQLite（按项目约定不使用容器，启动方式见 README §5）
-需要说明的差异：作业推荐 Node.js 后端，本项目按既定技术栈用 Spring Boot 实现；
-数据库选用 SQLite（单文件，便于复现）；启动方式为本地脚本 + 单 jar，而非 Docker Compose。
-以上取舍与理由见 README「与作业原文的差异」与 docs/DELIVERY.md §2。
-
-开发过程全程保留 Prompt 与工具调用记录（docs/PROMPT_LOG.md），AI 生成与人工修改的边界见 README §7。
+技术栈：Spring Boot 3.5.16 + JDK 17 + Vue 3（UI 手写，无组件库）+ SQLite
+说明：现行作业说明"前端及后端框架不限"，本项目按既定栈实现；UI 不使用组件库属自选
+（理由见 docs/UI_ADR.md），不影响功能与体验要求。
 
 谢谢！
 张三 / 电话 / 邮箱
 ```
 
-附件清单（发送前逐项打勾）：简历 ☐ · 源码压缩包或仓库链接 ☐ · 视频链接 ☐ · 说明正文 ☐
+发送前清单：仓库可访问 ☐ · zip 包 ☐ · Prompt 记录 ☐ · 工作流程说明 ☐ · 3 张截图 ☐ · 主题格式 ☐
 
 ---
 
-## 6. 评分维度自检（满分 100）
+## 6. 核心考察点自检（现行说明 5 条）
 
-| 维度 | 分值 | 我们靠什么拿分 | 证据 | 主要风险 |
-| --- | --- | --- | --- | --- |
-| 架构与工程化 | 30 | 五层分包与依赖方向；`SessionActor` 显式状态机；Flyway 迁移；统一异常 + 结构化日志（MDC 跨线程）；Actuator；`.env.example` | ARCHITECTURE §2–§3；README §4 | 分层被"图省事"打穿（Controller 直接写 Mapper） |
-| 并发与流式 | 25 | 顺序调度 + 并行 fan-out；单 SSE 多路复用；两级信号量；超时 abort + 单条重试；写锁串行化（delta 合并发送）；`Last-Event-ID` 续传 | ARCHITECTURE §3.2–§3.4；API §3 | 并行写成串行（`get()` 阻塞）；一个 agent 失败拖垮全场 |
-| 数据与闭环 | 20 | 7 张表覆盖席位/消息/轨迹/纪要/参与；纪要版本化落库可复盘；溯源双保险（`quote_message_id` + `sourceMessageIds`） | DATABASE 全文；PRD FR-6/FR-7 | 纪要只写前端状态、刷新即丢；SQLite 长事务卡死 |
-| 前端体验 | 15 | 三色区分 + 席位状态点；三档响应式；流式渲染防抖动；**UI 全手写、界面全中文**（合规，见 [ADR-001](UI_ADR.md)） | PRD §8；ARCHITECTURE §3.3 | 流式抖动、自动滚动打断阅读 |
-| 文档与过程 | 10 | 8 份文档（含架构图/ER/状态机/时序）；Prompt 留痕含技术栈变更决策；commit 一次一件事 | `docs/`；PROMPT_LOG | 文档与代码不一致（改代码不改契约） |
-
-**自评目标：≥85。** 明确放弃的分（换取舍）：
-
-- 不做多人同场围观（−3 潜在体验分），换取并发模型简洁可信；
-- 不做向量检索/联网（避免"专家观点"变检索摘要，伤害产品形态）；
-- 不做账号体系（匿名 deviceId 足够验证形态）。
-
----
-
-## 7. 72 小时排期（含交付动作）
-
-| 时段 | 内容 | 产出 |
+| 考察点 | 我们的应对 | 证据 |
 | --- | --- | --- |
-| H0–H3 | M0 文档（当前） | 8 份文档 + 仓库初始化 |
-| H3–H8 | M1 骨架 | pom / Flyway 7 表 / health / Vue 骨架 / 脚本 |
-| H8–H15 | M2 组局 | 大厅 + 席位流式 + 认领 |
-| H15–H35 | M3 讨论（最重） | Actor / 调度 / 并行 SSE / 轨迹 / 插话 |
-| H35–H43 | M4 收敛 | 六段纪要 + 落库 + 溯源 |
-| H43–H53 | M5 质量 | E2E 5 条 + 集成 13 条 + 视觉走查 |
-| H53–H58 | 交付动作 | README 定稿 → 打包 → 录屏 → 邮件发送 |
-| H58–H66 | 缓冲 | 修 bug、补文档、应对演示翻车 |
-| H66–H72 | 冻结 | 只改文档错字，不动代码（避免演示与仓库不一致） |
+| 在不同阶段合理使用不同开发范式，避免大模型幻觉 | 六段推进 + 四范式（SDD/DDD/TDD/E2E）；每阶段先契约后实现，AI 输出必过测试 | WORKFLOW §2、PROMPT_LOG §4.1 |
+| 基于业务需求驱动数据建模，与 API 契约精确对应 | 7 表 + 17 接口 + SSE 13 类事件，一一映射到 FR-1~FR-9（DATABASE §8、PRD §4.5） | DATABASE、API、PRD |
+| 以演播厅视觉与交互驱动前端组件与状态流转 | 三色席位 + 状态点 + 消息流 + 轨迹时间线；四档响应式、区域独立滚动 | PRD §8、README §2.2 |
+| 核心逻辑遵循 TDD，含完整 E2E | 单测覆盖 SpeakerPolicy/ContextBuilder/状态机；5 条 E2E + 15 条集成 | TESTING §2–§4 |
+| 考察 Prompt 结构化表达与引导 AI 解决工程问题 | 记录含"意图/挑战/修正"；7 条走偏案例（含依据版本搞错） | PROMPT_LOG §3/§5 |
+| UI 是否真的像在旁观一场演播厅讨论 | 席位/轨迹/引用/新发言提示等细节；无"后台管理系统"观感 | UI_ADR §4.4、PRD §8 |
+
+---
+
+## 7. 版本差异核对（避免拿错依据）
+
+| 项 | 旧版说明 | 现行版说明 | 本项目执行 |
+| --- | --- | --- | --- |
+| UI 组件库 | 「严禁使用任何 UI 框架/组件库（如 Ant Design、Element Plus）」 | **未限制**（"前端及后端框架不限"） | 自选不采用，理由见 ADR-001 |
+| 数据库 | 未指定 | **SQLite** | SQLite ✅ |
+| 交付物 | 11 项（含 ≥30 commit、≥3 E2E、3–5 分钟视频） | 3 项（源码+文档 / Prompt 记录 ≥5 段 / 工作流程说明） | 以本版为主，旧版数量要求作为加分项超额完成（7 表/17 API/5 E2E/27→53 commit） |
+| 提交 | handshake@gaodun.cn，主题【AI开发实习生-姓名-岗位】 | **xulei@wisqwest.com**，主题【远程作业提交】姓名 | 按现行版 |
+
+---
+
+## 8. 交付前 24 小时检查表
+
+- [ ] 删 `data/panel-studio.db` 重启能自动建库 + 5 场样例数据（证明初始化脚本与数据质量）
+- [ ] `/swagger-ui.html` 可访问，endpoint 数量与 API.md 一致（17）
+- [ ] 3 张核心页面截图入 `docs/screenshots/` 并嵌入 README §2.2
+- [ ] PROMPT_LOG 覆盖四范式，且每段有"意图/挑战/修正"
+- [ ] WORKFLOW.md 1–1.5 页，含 3 个典型问题与效率台账
+- [ ] README「已完成能力 / 后续改进方向」两节齐全
+- [ ] `git log` 呈层级（docs → feat(db) → feat(server) → feat(web) → test），无"更新/修改"
+- [ ] `docs/git-history.txt` 已导出；仓库已邀请评审
+- [ ] zip 不含 `node_modules/` `target/` `data/`
+- [ ] 邮件主题、收件人、附件无误；链接可匿名访问
