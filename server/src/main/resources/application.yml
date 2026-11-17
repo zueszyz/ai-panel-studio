@@ -1,0 +1,93 @@
+server:
+  port: ${SERVER_PORT:8080}
+  tomcat:
+    threads:
+      max: 200
+      min-spare: 10
+    accept-count: 100
+  compression:
+    enabled: true
+    # 注意：不包含 text/event-stream —— 压缩会把流式攒成一次性输出
+    mime-types: application/json,application/javascript,text/css,text/html
+  error:
+    whitelabel:
+      enabled: false
+
+spring:
+  application:
+    name: panel-studio
+  profiles:
+    default: dev
+  datasource:
+    url: jdbc:sqlite:${SQLITE_PATH:./data/panel-studio.db}?journal_mode=WAL&synchronous=NORMAL&busy_timeout=5000&foreign_keys=on
+    driver-class-name: org.sqlite.JDBC
+    hikari:
+      pool-name: panel-sqlite
+      maximum-pool-size: 4
+      minimum-idle: 1
+      connection-timeout: 3000
+      # 双保险：连接复用时也确保外键开启（SQLite 默认关闭）
+      connection-init-sql: PRAGMA foreign_keys=ON
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+  mvc:
+    async:
+      # SSE 连接不设超时，否则讨论进行到一半会被容器掐断
+      request-timeout: -1
+  jackson:
+    default-property-inclusion: non_null
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    default-enum-type-handler: com.baomidou.mybatisplus.core.handlers.MybatisEnumTypeHandler
+  global-config:
+    banner: false
+    db-config:
+      id-type: input
+      table-underline: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+panel:
+  web:
+    origin: ${WEB_ORIGIN:http://localhost:5173}
+  llm:
+    base-url: ${LLM_BASE_URL:}
+    api-key: ${LLM_API_KEY:}
+    model: ${LLM_MODEL:}
+    max-tokens: 800
+    temperature: 0.8
+  executor:
+    core: ${AGENT_EXECUTOR_CORE:8}
+    max: ${AGENT_EXECUTOR_MAX:16}
+    queue: ${AGENT_EXECUTOR_QUEUE:200}
+  concurrency:
+    per-room: ${MAX_CONCURRENT_AGENTS_PER_ROOM:3}
+    global: ${MAX_CONCURRENT_AGENTS_GLOBAL:20}
+  timeout:
+    first-token-ms: ${LLM_TIMEOUT_FIRST_TOKEN_MS:45000}
+    total-ms: ${LLM_TIMEOUT_TOTAL_MS:90000}
+  sse:
+    heartbeat-ms: ${SSE_HEARTBEAT_MS:15000}
+    buffer-size: 500
+  panel:
+    regen-limit: 2
+    speaker-limit: ${TURN_SPEAKER_LIMIT:3}
+  budget:
+    discussion-tokens: ${DISCUSSION_TOKEN_BUDGET:120000}

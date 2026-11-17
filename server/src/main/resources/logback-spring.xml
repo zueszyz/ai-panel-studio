@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+  <property name="PLAIN_PATTERN"
+            value="%d{HH:mm:ss.SSS} %-5level [%thread] %logger{32} req=%X{requestId:-} dk=%X{discussionId:-} seat=%X{seatId:-} - %msg%n"/>
+
+  <appender name="CONSOLE_PLAIN" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>${PLAIN_PATTERN}</pattern>
+      <charset>UTF-8</charset>
+    </encoder>
+  </appender>
+
+  <!-- 结构化 JSON 日志：字段固定 requestId / deviceId / discussionId / turnId / seatId / messageId -->
+  <appender name="CONSOLE_JSON" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+      <includeMdcKeyName>requestId</includeMdcKeyName>
+      <includeMdcKeyName>deviceId</includeMdcKeyName>
+      <includeMdcKeyName>discussionId</includeMdcKeyName>
+      <includeMdcKeyName>turnId</includeMdcKeyName>
+      <includeMdcKeyName>seatId</includeMdcKeyName>
+      <includeMdcKeyName>messageId</includeMdcKeyName>
+      <includeMdcKeyName>path</includeMdcKeyName>
+      <customFields>{"app":"panel-studio"}</customFields>
+      <charset>UTF-8</charset>
+    </encoder>
+  </appender>
+
+  <springProfile name="dev,test">
+    <root level="INFO">
+      <appender-ref ref="CONSOLE_PLAIN"/>
+    </root>
+    <logger name="com.panelstudio" level="DEBUG"/>
+  </springProfile>
+
+  <springProfile name="prod,e2e">
+    <root level="INFO">
+      <appender-ref ref="CONSOLE_JSON"/>
+    </root>
+  </springProfile>
+</configuration>
