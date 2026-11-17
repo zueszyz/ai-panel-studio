@@ -257,12 +257,27 @@ SQLite 的写操作是**全库串行**的，多 agent 同时结束消息会撞 `
 
 ---
 
+### 3.9 数据访问层约定（MyBatis-Plus）
+
+| 约定 | 内容 |
+| --- | --- |
+| 框架 | **MyBatis-Plus 3.5.12**（`mybatis-plus-spring-boot3-starter`）。不用 MyBatis 原生 `SqlSession`，也不用 JPA |
+| 简单查询 | `BaseMapper` + `LambdaQueryWrapper`（类型安全，不手拼字段名） |
+| 复杂聚合 | `@Select` 或 `resources/mapper/*.xml`（轨迹耗时、失败率统计） |
+| 事务 | `@Transactional` 只包 DB 写；**绝不在事务里调 LLM 或 `emitter.send`**（SQLite 写锁会被锁死） |
+| 并发控制 | 不使用 `SELECT … FOR UPDATE`（SQLite 无行级锁）；回合推进用 CAS：`UPDATE … WHERE turn_index = ?`，影响 0 行即冲突重试 |
+| 软删除/填充 | `@TableLogic` + `MetaObjectHandler`；JSON 用 `JacksonTypeHandler` |
+
+完整字段映射、拦截器配置与"硬规矩"见 [DATABASE.md](DATABASE.md) §6。
+
+---
+
 ## 4. 技术选型与取舍
 
 | 决策 | 选择 | 放弃的方案 | 理由 |
 | --- | --- | --- | --- |
 | 后端框架 | Spring Boot 3.5.16 + JDK 17 | Quarkus / 纯 Servlet | 项目既定；3.5 是 3.x 的最新线，生态与文档对评审友好；JDK 17 LTS 稳定 |
-| Web 层 | Spring MVC | Spring WebFlux | 数据访问是阻塞式的（MyBatis + SQLite），混用 R2DBC 得不偿失；80 路 SSE 用线程池足够，WebFlux 的复杂度换不来收益 |
+| Web 层 | Spring MVC | Spring WebFlux | 数据访问是阻塞式的（MyBatis-Plus + SQLite），混用 R2DBC 得不偿失；80 路 SSE 用线程池足够，WebFlux 的复杂度换不来收益 |
 | SSE 实现 | `SseEmitter` | WebSocket / `ResponseBodyEmitter` | 只需单向推送；`SseEmitter` 自带事件名/ID/重连语义，比裸写 `PrintWriter` 省事 |
 | 编排 | 自研 `SessionActor` | Spring AI / LangChain4j | 调度是评分核心，框架把重试、内存、流式封装成黑盒，出问题无法解释；自研约 500 行，策略是纯函数可单测 |
 | LLM 调用 | `WebClient` 手写流式解析 + JSON 模式 | Spring AI `ChatClient` | 需要精确控制 abort / 首 token 超时 / 单席位模型差异；适配层接口保留，后续可替换 |
@@ -273,7 +288,7 @@ SQLite 的写操作是**全库串行**的，多 agent 同时结束消息会撞 `
 | 前端 SSE | `fetch` + `ReadableStream` | 原生 `EventSource` | `EventSource` **不能设置请求头**（本项目要带 `X-Device-Id`），也不能主动 abort；自解析约 80 行，换来完整控制 |
 | 测试 | JUnit 5 + MockMvc + WireMock + Playwright | Postman / 纯手工 | 后端用例离线可跑（WireMock 造故障），E2E 覆盖真实浏览器 |
 
-**为什么不用 WebFlux**：本项目 90% 的时间花在等 LLM，看似"适合响应式"，但 SQLite + MyBatis 是阻塞式，混用要么全链路 R2DBC（SQLite 无官方响应式驱动），要么在 `boundedElastic` 上跑阻塞代码（等于线程池，还多了心智负担）。MVC + 显式线程池在这个规模是更诚实的选择。
+**为什么不用 WebFlux**：本项目 90% 的时间花在等 LLM，看似"适合响应式"，但 SQLite + MyBatis-Plus 是阻塞式，混用要么全链路 R2DBC（SQLite 无官方响应式驱动），要么在 `boundedElastic` 上跑阻塞代码（等于线程池，还多了心智负担）。MVC + 显式线程池在这个规模是更诚实的选择。
 
 **为什么 SQLite 也敢用于"并发流式"场景**：并发发生在**网络 IO**（多路 LLM 流），不在数据库。落库是"每条消息结束时一次 UPDATE"，单场 4 agent × 8 回合 ≈ 32 次写，完全在 SQLite 能力范围内。真正的坑是"在事务里等 LLM"——禁止即可。
 
