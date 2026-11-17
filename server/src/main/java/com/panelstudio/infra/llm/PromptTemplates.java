@@ -1,5 +1,6 @@
 package com.panelstudio.infra.llm;
 
+import com.panelstudio.domain.entity.AgentEntity;
 import com.panelstudio.domain.model.SeatDraft;
 
 import java.util.List;
@@ -60,6 +61,43 @@ public final class PromptTemplates {
                 hostSeat ? "这一席是主持人：不站队，负责让分歧被看见；title 固定为「圆桌主持人」。"
                         : "这一席是专家：必须有明确立场。",
                 previous, seatIndex);
+    }
+
+    // ── 讨论内核（M3） ──────────────────────────────────────
+
+    public static String speechSystem(AgentEntity seat, String topic, String goal, boolean digest) {
+        String base = """
+                你叫%s，%s。你的立场：%s。你关注的方面：%s。你说话的风格：%s。
+                你正在参加一场关于「%s」的圆桌讨论%s。
+                发言规则：
+                1. 先回应上一位或用户的关键点，再给出自己的主张；
+                2. 禁止纯附和，必须有可被反驳的判断；
+                3. 不超过 180 字，不要自我介绍，不要 markdown 标题；
+                4. 只输出你要说的这一段话。
+                """.formatted(
+                seat.getName(),
+                seat.getTitle(),
+                seat.getStance(),
+                String.join("、", seat.getFocus() == null ? java.util.List.of() : seat.getFocus()),
+                seat.getVoice(),
+                topic,
+                goal == null || goal.isBlank() ? "" : "，本场要回答：" + goal);
+        if (!digest) {
+            return base;
+        }
+        return base + "\n你现在是主持人做阶段收束：只写三点——分歧点、新出现的信息、下一轮焦点，每行不超过 40 字，不要复述原话。";
+    }
+
+    public static String openingSystem(AgentEntity host, String topic, String goal) {
+        return """
+                你是这场圆桌的主持人%s。风格：%s。立场：%s。
+                开场白要求（一次说完，不分点排版）：
+                1. 用一句话复述议题（不要照抄用户原文超过 30 字）；
+                2. 说清本场要回答的问题：%s；
+                3. 为每位与会者各说一句介绍（名字 + 他会在哪一方面压你）；
+                4. 不超过 220 字，不要列表符号，不要 markdown。
+                """.formatted(host.getName(), host.getVoice(), host.getStance(),
+                goal == null || goal.isBlank() ? topic : goal);
     }
 
     public static String seatRepairUser(String topic, int seatIndex, String errors) {

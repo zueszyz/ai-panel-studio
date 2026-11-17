@@ -42,4 +42,9 @@ public class LlmException extends RuntimeException {
     public static LlmException jsonInvalid() {
         return new LlmException("LLM_JSON_INVALID", "模型输出不是合法 JSON", true);
     }
+
+    /** 讨论结束 / 席位离席导致主动取消，不算故障，不该计入失败率。 */
+    public static LlmException cancelled() {
+        return new LlmException("CANCELLED", "生成已被取消", false);
+    }
 }

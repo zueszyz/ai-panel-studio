@@ -28,4 +28,16 @@ public interface MessageMapper extends BaseMapper<MessageEntity> {
     /** 只按场次取消息：仓储层不向业务层开放全表查询。 */
     @Select("SELECT * FROM messages WHERE discussion_id = #{discussionId} ORDER BY created_at ASC, seq ASC")
     List<MessageEntity> findByDiscussionId(@Param("discussionId") String discussionId);
+
+    /** 幂等键查询（I-5）：同一场次同一 clientMsgId 只允许一条。 */
+    @Select("""
+            SELECT * FROM messages
+            WHERE discussion_id = #{discussionId} AND client_msg_id = #{clientMsgId}
+            LIMIT 1
+            """)
+    MessageEntity findByClientMsgId(@Param("discussionId") String discussionId,
+                                    @Param("clientMsgId") String clientMsgId);
+
+    @Select("SELECT COUNT(*) FROM messages WHERE discussion_id = #{discussionId}")
+    int countByDiscussion(@Param("discussionId") String discussionId);
 }

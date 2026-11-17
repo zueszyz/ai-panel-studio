@@ -236,6 +236,8 @@ public class AppProperties {
 
     public static class Budget {
         private long discussionTokens = 120_000L;
+        /** 达到该比例后主持人提示收敛。 */
+        private double warnRatio = 0.8;
 
         public long getDiscussionTokens() {
             return discussionTokens;
@@ -243,6 +245,14 @@ public class AppProperties {
 
         public void setDiscussionTokens(long discussionTokens) {
             this.discussionTokens = discussionTokens;
+        }
+
+        public double getWarnRatio() {
+            return warnRatio;
+        }
+
+        public void setWarnRatio(double warnRatio) {
+            this.warnRatio = warnRatio;
         }
     }
 }
