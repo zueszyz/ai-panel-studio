@@ -272,6 +272,41 @@ SQLite 的写操作是**全库串行**的，多 agent 同时结束消息会撞 `
 
 ---
 
+### 3.10 多讨论隔离与密钥边界
+
+作业要求：**多个讨论可并行，不同讨论的状态、事件流、transcript、共识与分歧必须互相隔离**；**大模型 API Key 只能放在后端**。
+
+**隔离矩阵**
+
+| 维度 | 载体 | 隔离方式 | 串台后果 |
+| --- | --- | --- | --- |
+| 调度状态 | `SessionActorRegistry` | key = `discussionId`；每场独立 `queue / inflight / turn / budget` | 推进了别人的回合 |
+| 事件流 | `SseRegistry` | key = `discussionId`，value 为本场 emitter 列表；广播只遍历本场 | 看到别场的发言 |
+| Transcript | `messages` 表 | Repository 只暴露"按场次"方法（`findByDiscussionId`），不向业务层开放全表查询 | 纪要混入其他场次消息 |
+| 共识/分歧 | `minutes` | 生成时只读本场 messages；落库前校验 `seatId` 属于本场 | 纪要张冠李戴 |
+| 并发资源 | 每场 `Semaphore(3)` + 全局 `Semaphore(20)` | 单场跑满不饿死其他场 | 一场长讨论拖垮全站 |
+| 预算 | `TokenBudget`（每 actor 一个） | 单场 120k，互不借额 | 一场烧完全局额度 |
+| 前端 | Pinia store 按 `discussionId` 建 key；页面只订阅一条 stream | 切场先 `abort()` 旧连接并清空 store | 上一场消息残留在新界面 |
+
+**禁止写法**（code review 直接打回）：
+
+1. `static` 可变集合存会话数据（多实例/热部署必炸）；
+2. 单例 Service 里缓存"当前讨论"；
+3. 全局 emitter 集合不按 `discussionId` 分组；
+4. 业务层直接 `selectList(null)` 取全表再在内存过滤。
+
+**密钥边界**
+
+| 项 | 做法 |
+| --- | --- |
+| 读取 | `LLM_API_KEY` 只从环境变量读（`@ConfigurationProperties`），`application.yml` 里不写明文，`.env` 进 `.gitignore` |
+| 前端 | 前端只调本项目 `/api/**`，不直连模型厂商；**不要**把 key 放进 `VITE_*` 变量（Vite 会把它编进产物，等于公开） |
+| 日志 | 打印上游请求时剔除 `Authorization`；异常不回传上游原始 body |
+| CORS | 只允许 `WEB_ORIGIN`，不用 `*` |
+| 构建期校验 | `scripts/build` 结束后扫描 `web/dist` 是否出现 `sk-` / `apiKey`，命中即构建失败 |
+
+---
+
 ## 4. 技术选型与取舍
 
 | 决策 | 选择 | 放弃的方案 | 理由 |
@@ -283,7 +318,7 @@ SQLite 的写操作是**全库串行**的，多 agent 同时结束消息会撞 `
 | LLM 调用 | `WebClient` 手写流式解析 + JSON 模式 | Spring AI `ChatClient` | 需要精确控制 abort / 首 token 超时 / 单席位模型差异；适配层接口保留，后续可替换 |
 | ORM | MyBatis-Plus | Spring Data JPA (Hibernate) | Hibernate 的 SQLite 方言属社区维护，JSON/部分索引支持别扭；MyBatis-Plus 的 `JacksonTypeHandler` 处理 JSON 字段更直接，SQL 可控 |
 | 数据库 | **SQLite 3（WAL）** | PostgreSQL / MySQL | 项目既定。零运维、单文件、随包分发，评审一条命令就能跑；代价是单写者与无水平扩展 —— 用短事务 + 单条 UPDATE + 重试兜住，并在 DATABASE.md 写明迁移到 PG 的路径 |
-| 前端 | Vue 3.4 + **手写 CSS**（无组件库） | React / **Element Plus** / Naive UI / Ant Design Vue | 项目既定 Vue 3。组件库评估见 [ADR-001](UI_ADR.md)：**技术上可用，但不采用** —— ①作业明文禁止且点名 Element Plus；②三色席位、消息流、轨迹时间线都没有现成组件，组件库只覆盖约 30% 界面；③中文 UI 需要文案与排版控制，组件库反而多一层默认英文与设计语言 |
+| 前端 | Vue 3.4 + **手写 CSS**（无组件库） | React / **Element Plus** / Naive UI / Ant Design Vue | 项目既定 Vue 3。组件库评估见 [ADR-001](UI_ADR.md)：**Element Plus 可行且合规**（现行说明"框架不限"），但 ①三色席位、消息流、轨迹时间线无现成组件，最多覆盖约 30% 界面；②中文 UI 需文案与排版完全可控，组件库多一层默认英文；③默认观感偏后台，与"演播厅"评分点冲突。**Element 仅支持 Vue 2，技术出局** |
 | 状态管理 | Pinia 2 | Vuex / 自建 eventBus | Vue 3 官方推荐，模块化清晰；流式消息用 `Map<messageId, Bubble>` 存，配合 rAF 合批 |
 | 前端 SSE | `fetch` + `ReadableStream` | 原生 `EventSource` | `EventSource` **不能设置请求头**（本项目要带 `X-Device-Id`），也不能主动 abort；自解析约 80 行，换来完整控制 |
 | 测试 | JUnit 5 + MockMvc + WireMock + Playwright | Postman / 纯手工 | 后端用例离线可跑（WireMock 造故障），E2E 覆盖真实浏览器 |
