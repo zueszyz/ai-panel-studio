@@ -1,0 +1,34 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build output
+dist/
+build/
+*.tsbuildinfo
+
+# env
+.env
+.env.*
+!.env.example
+
+# runtime data
+data/
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+logs/
+*.log
+
+# test artifacts
+coverage/
+playwright-report/
+test-results/
+.playwright/
+
+# editor / os
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
