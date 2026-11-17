@@ -68,6 +68,8 @@
 ```text
 ai-panel-studio/                     ← 压缩包根目录（源码与文档同主目录）
 ├── README.md                        ← 运行指南 / 环境变量 / 技术选型 / API 列表 / 已完成与改进
+├── AGENTS.md                        ← AI 协作约束总纲（红线 / 必做 / 模块门禁）
+├── rules/                           ← 6 份分模块约束（前端视觉 / 接口并发 / 数据测试 / 工作流…）
 ├── docs/
 │   ├── PRD.md  ARCHITECTURE.md  DATABASE.md  API.md
 │   ├── TESTING.md  PROJECT_PLAN.md  PROMPT_LOG.md  DELIVERY.md  WORKFLOW.md
@@ -163,6 +165,7 @@ zip -r ai-panel-studio.zip . -x "*/node_modules/*" "*/target/*" "data/*"
 - [ ] `/swagger-ui.html` 可访问，endpoint 数量与 API.md 一致（17）
 - [ ] 3 张核心页面截图入 `docs/screenshots/` 并嵌入 README §2.2
 - [ ] PROMPT_LOG 覆盖四范式，且每段有"意图/挑战/修正"
+- [ ] `AGENTS.md` + `rules/`（6 份）随仓库交付，且与实现一致（约束不是摆设）
 - [ ] WORKFLOW.md 1–1.5 页，含 3 个典型问题与效率台账
 - [ ] README「已完成能力 / 后续改进方向」两节齐全
 - [ ] `git log` 呈层级（docs → feat(db) → feat(server) → feat(web) → test），无"更新/修改"

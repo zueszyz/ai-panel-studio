@@ -40,6 +40,7 @@
 
 ### M1 骨架
 
+- [ ] 落地 `AGENTS.md` + `rules/`（6 份约束：项目边界 / 架构 / 前端视觉 / 接口并发 / 数据测试 / 工作流），作为后续所有 AI 会话的开工前置
 - [ ] `server/pom.xml`：Spring Boot 3.5.16 parent、`spring-boot-starter-web/validation/actuator/test`、`mybatis-plus-spring-boot3-starter`、`flyway-core` + `flyway-database-sqlite`、`sqlite-jdbc`、`springdoc-openapi-starter-webmvc-ui`、`logstash-logback-encoder`、`wiremock-standalone(test)`
 - [ ] `application.yml`（SQLite URL + Hikari + Flyway + 异步线程池 + 压缩/超时）+ `application-test.yml`
 - [ ] Flyway `V1__schema.sql`（7 表）/ `V2__indexes.sql` / `V3__seed_demo.sql`

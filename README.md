@@ -125,6 +125,8 @@ flowchart LR
 
 ```text
 ai-panel-studio/
+├── AGENTS.md                      # AI 协作约束总纲（红线 / 必做 / 模块地图）
+├── rules/                         # 分模块约束：项目边界 · 架构 · 前端视觉 · 接口并发 · 数据测试 · 工作流
 ├── docs/                          # 设计文档（先于代码）
 │   ├── PRD.md                     # 产品需求文档
 │   ├── ARCHITECTURE.md            # 架构 + 并发/流式设计
@@ -211,6 +213,7 @@ java -jar server/target/panel-studio.jar  # http://localhost:8080
 
 本项目在 `CodeBuddy` 内完成，全程保留 Prompt 与工具调用记录（见 [PROMPT_LOG.md](docs/PROMPT_LOG.md)）。原则：
 
+- **约束先行**：仓库根 [AGENTS.md](AGENTS.md) 与 [rules/](rules/) 是写给 AI 的硬性约束（含前端视觉标准、按模块逐步开发、禁止一次性生成整个项目），任何会话开工前必须先读。
 - **文档与契约由 AI 起草、人工评审后定稿**；需求取舍、并发模型、失败策略以人工判断为准。
 - **代码由 AI 生成后逐文件 Review**，关键路径（`SessionActor` 调度、`SseEmitter` 生命周期、SQLite 事务边界）人工改写并补测试。
 - 每份文档与每个模块在 commit message 中标注 `ai-gen` / `ai-gen+human-edit` / `human`。
