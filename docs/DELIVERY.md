@@ -124,7 +124,7 @@ zip -r ai-panel-studio.zip . -x "*/node_modules/*" "*/target/*" "data/*" ".git/o
 | 架构与工程化 | 30 | 五层分包与依赖方向；`SessionActor` 显式状态机；Flyway 迁移；统一异常 + 结构化日志（MDC 跨线程）；Actuator；`.env.example` | ARCHITECTURE §2–§3；README §4 | 分层被"图省事"打穿（Controller 直接写 Mapper） |
 | 并发与流式 | 25 | 顺序调度 + 并行 fan-out；单 SSE 多路复用；两级信号量；超时 abort + 单条重试；写锁串行化（delta 合并发送）；`Last-Event-ID` 续传 | ARCHITECTURE §3.2–§3.4；API §3 | 并行写成串行（`get()` 阻塞）；一个 agent 失败拖垮全场 |
 | 数据与闭环 | 20 | 7 张表覆盖席位/消息/轨迹/纪要/参与；纪要版本化落库可复盘；溯源双保险（`quote_message_id` + `sourceMessageIds`） | DATABASE 全文；PRD FR-6/FR-7 | 纪要只写前端状态、刷新即丢；SQLite 长事务卡死 |
-| 前端体验 | 15 | 三色区分 + 席位状态点；三档响应式；固定槽位 + rAF 合批防跳动；轨迹面板"可观测但不说破" | PRD §8；ARCHITECTURE §3.3 | 流式抖动、自动滚动打断阅读 |
+| 前端体验 | 15 | 三色区分 + 席位状态点；三档响应式；流式渲染防抖动；**UI 全手写、界面全中文**（合规，见 [ADR-001](UI_ADR.md)） | PRD §8；ARCHITECTURE §3.3 | 流式抖动、自动滚动打断阅读 |
 | 文档与过程 | 10 | 8 份文档（含架构图/ER/状态机/时序）；Prompt 留痕含技术栈变更决策；commit 一次一件事 | `docs/`；PROMPT_LOG | 文档与代码不一致（改代码不改契约） |
 
 **自评目标：≥85。** 明确放弃的分（换取舍）：

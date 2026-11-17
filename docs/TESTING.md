@@ -58,6 +58,8 @@ stubFor(post(urlEqualTo("/v1/chat/completions"))
 
 ## 2. E2E 用例
 
+> **定位策略**：断言只用两类锚点 —— ① `data-testid`（业务语义，如 `seat-card`、`message-bubble`）；② 中文文案（`getByText('发起圆桌')`）。**不依赖任何第三方组件的内部 class**：本项目手写 UI（[ADR-001](UI_ADR.md)），且即便将来引入组件库，class 也会随版本变。
+
 ### E2E-1 组局 → 生成席位 → 认领 → 开场（主链路 A）
 
 | 项 | 内容 |

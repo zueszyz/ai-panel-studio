@@ -46,7 +46,7 @@
 - [ ] `PanelStudioApplication`、`AsyncConfig`（`agentExecutor` + `MdcTaskDecorator`）、`MybatisPlusConfig`（分页 + `JacksonTypeHandler`）
 - [ ] `GlobalExceptionHandler`（`@RestControllerAdvice` → 统一错误体）、`TraceIdFilter`（`X-Device-Id` / MDC）
 - [ ] `GET /api/health`（自定义 `LlmHealthIndicator`）、`GET /api/metrics`
-- [ ] Vue：`vite.config.ts`（`/api` 代理）、路由三页占位、`styles/tokens.css`（三色 + 间距 + 字号）、Pinia 初始化
+- [ ] Vue：`vite.config.ts`（`/api` 代理）、路由四页占位、`styles/tokens.css`（三色 + 间距 + 字号 + 中文字体栈）、`lib/copy.ts`（中文文案表）、Pinia 初始化；**不引入任何 UI 组件库**（[ADR-001](UI_ADR.md)）
 - [ ] `scripts/dev.sh` / `dev.bat` / `build.sh` / `build.bat`（**不使用 Docker**）
 - [ ] ESLint + Prettier（web）、Checkstyle（可选）、Playwright 脚手架
 
@@ -165,6 +165,7 @@
 | 53 | `docs: finalize readme with runbook and ai usage notes` `[me]` | M5 |
 
 > 规划 53 条，实际按开发节奏自然增量；最终以 `git log --oneline` 为准（≥30 条）。
+> 补充：UI 方案评估单独提交一条 `docs(adr): evaluate element plus and decide to hand-write ui`，不占用上表编号。
 
 ---
 
