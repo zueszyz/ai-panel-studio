@@ -4,6 +4,7 @@ import com.panelstudio.api.dto.ApiError;
 import com.panelstudio.domain.statemachine.IllegalStateTransitionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -71,6 +72,17 @@ public class ApiExceptionHandler {
         log.debug("请求体无法解析: {}", ex.getMessage());
         return ResponseEntity.badRequest()
                 .body(ApiError.of("VALIDATION_ERROR", "请求体不是合法 JSON"));
+    }
+
+    /**
+     * 并发认领同一席位时，数据库的部分唯一索引会抛 DuplicateKey：
+     * 这是业务上的「席位已被认领」，不是服务端故障。
+     */
+    @ExceptionHandler(DuplicateKeyException.class)
+    public ResponseEntity<ApiError> handleDuplicateKey(DuplicateKeyException ex) {
+        log.debug("唯一约束冲突: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiError.of("SEAT_TAKEN", "该席位已被其他参与者认领"));
     }
 
     @ExceptionHandler(IllegalStateTransitionException.class)
