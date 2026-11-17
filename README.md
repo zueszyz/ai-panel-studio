@@ -44,7 +44,7 @@
 
 | 层 | 选型 | 为什么是它 |
 | --- | --- | --- |
-| Web 层 | Spring MVC（Tomcat）+ `SseEmitter` | 数据访问是阻塞式的（MyBatis + SQLite），MVC 更顺；80 路 SSE 用线程池足够，不必上 WebFlux |
+| Web 层 | Spring MVC（Tomcat）+ `SseEmitter` | 数据访问是阻塞式的（MyBatis-Plus + SQLite），MVC 更顺；80 路 SSE 用线程池足够，不必上 WebFlux |
 | 实时通道 | SSE，**单连接按 `messageId` 多路复用** | 单向推送足够；比 WebSocket 易调试、易穿透代理 |
 | 多 Agent 编排 | **自研** `SessionActor` + `CompletableFuture` + `Semaphore` | 调度正确性是本题评分重点，不交给 Spring AI 黑盒链 |
 | 数据访问 | MyBatis-Plus 3.5.12（`mybatis-plus-spring-boot3-starter`）+ HikariCP | SQLite 方言简单可控；`JacksonTypeHandler` 直接映射 JSON 字段 |
@@ -77,7 +77,8 @@ ai-panel-studio/
 │   ├── API.md                     # 接口契约 + SSE 事件协议
 │   ├── TESTING.md                 # E2E 用例与验收清单
 │   ├── PROJECT_PLAN.md            # 里程碑 + commit 规划
-│   └── PROMPT_LOG.md              # Prompt / 工具调用留痕
+│   ├── PROMPT_LOG.md              # Prompt / 工具调用留痕
+│   └── DELIVERY.md                # 交付清单 / 打包 / 视频分镜 / 提交模板
 ├── server/                        # Spring Boot 3 · JDK 17 · Maven
 │   ├── pom.xml
 │   └── src/main/
@@ -91,7 +92,7 @@ ai-panel-studio/
 │       └── resources/
 │           ├── application.yml
 │           ├── db/migration/      # Flyway: V1__schema.sql / V2__indexes.sql / V3__seed.sql
-│           └── mapper/            # MyBatis XML（复杂查询）
+│           └── mapper/            # MyBatis-Plus 自定义 XML（仅复杂聚合）
 ├── web/                           # Vue 3 · TS · Vite
 │   ├── src/
 │   │   ├── pages/                 # lobby / panel / live / minutes
@@ -148,6 +149,7 @@ java -jar server/target/panel-studio.jar  # http://localhost:8080
 | [测试](docs/TESTING.md) | 5 条 E2E + 12 条集成用例、WireMock 故障注入、验收矩阵 |
 | [计划](docs/PROJECT_PLAN.md) | 里程碑、WBS、30+ commit 切分方案 |
 | [留痕](docs/PROMPT_LOG.md) | Prompt 记录、技术栈变更决策、AI 生成 / 人工修改边界 |
+| [交付](docs/DELIVERY.md) | 11 项硬性要求逐条对照、打包结构、视频分镜、邮件模板、评分自检 |
 
 ## 7. AI 工具使用说明
 
@@ -156,7 +158,23 @@ java -jar server/target/panel-studio.jar  # http://localhost:8080
 - **文档与契约由 AI 起草、人工评审后定稿**；需求取舍、并发模型、失败策略以人工判断为准。
 - **代码由 AI 生成后逐文件 Review**，关键路径（`SessionActor` 调度、`SseEmitter` 生命周期、SQLite 事务边界）人工改写并补测试。
 - 每份文档与每个模块在 commit message 中标注 `ai-gen` / `ai-gen+human-edit` / `human`。
+- **不是一句话生成**：按"文档 → 骨架 → 组局 → 讨论 → 收敛 → 质量"六段推进，每段都有独立的 Prompt 记录与人工修订；PROMPT_LOG 里能看到的是一次次纠偏（如技术栈三次变更、SQLite 单写者应对），而非一次性产出。
 
-## 8. License
+## 8. 与作业原文的差异
+
+| 项 | 作业原文 | 本项目 | 理由 |
+| --- | --- | --- | --- |
+| 后端语言 | 推荐 Node.js + TypeScript | **Spring Boot 3.5.16 + JDK 17** | 推荐非强制；三个考核点与语言无关，JDK 17 无虚拟线程反而更能体现并发调度的工程判断 |
+| 数据库 | 未指定 | **SQLite 3.40+（WAL）** | 单文件、零运维、随包复现；单写者代价见 [DATABASE](docs/DATABASE.md) §1.2 |
+| 启动方式 | 提到 "Docker Compose 一键起来" | **本地脚本 + 单个 jar**（按项目约定不用容器） | 无独立 DB 服务可编排；少一层代理少一个流式坑 |
+| 数量要求 | ≥5 表 / ≥8 API / ≥3 路由 / ≥3 E2E | 7 表 / 17 API / 4 路由 / 5 E2E | 只多不少，且每条需求带验收标准（PRD FR-1~FR-9） |
+
+## 9. 交付与提交
+
+- 必交清单（11 项）逐条对照、压缩包结构、**演示视频分镜**、提交邮件模板、**评分维度自检**：见 [docs/DELIVERY.md](docs/DELIVERY.md)。
+- 提交邮箱 `handshake@gaodun.cn`，主题 `【AI开发实习生-姓名-岗位】`，附件含简历 + 作品链接 + 视频链接；截止 72 小时。
+- 打包前导出提交历史：`git log --pretty=format:'%h %ad %s' --date=short > docs/git-history.txt`。
+
+## 10. License
 
 MIT
