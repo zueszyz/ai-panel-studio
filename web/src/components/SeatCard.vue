@@ -85,7 +85,7 @@ const replaced = computed(() => props.seat.status === 'REPLACED_BY_USER')
   gap: var(--space-3);
   padding: var(--space-4);
   padding-left: var(--space-4);
-  border-left: 3px solid var(--seat-color);
+  border-left: var(--border-accent) solid var(--seat-color);
   animation: seat-in var(--dur-slow) var(--ease);
 }
 

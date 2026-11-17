@@ -47,7 +47,7 @@ function onCreated(id: string): void {
 
 <template>
   <section class="page">
-    <div class="page__inner">
+    <div class="page__inner page__inner--wide">
       <header class="page-head">
         <div>
           <h1 class="page-title">{{ copy.lobby.title }}</h1>
@@ -266,9 +266,19 @@ function onCreated(id: string): void {
   margin-top: var(--space-5);
 }
 
+.page__inner--wide {
+  max-width: var(--content-wide);
+}
+
 @media (min-width: 1024px) {
   .grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1600px) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

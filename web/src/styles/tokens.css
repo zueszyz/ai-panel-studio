@@ -87,6 +87,7 @@
   --layout-trace-md: 320px;
   --layout-seats-sm: 220px;
   --content-max: 960px;
+  --content-wide: 1200px;
   --reading-max: 720px;
   --header-height: 60px;
   --status-dot: 6px;
@@ -94,5 +95,7 @@
   --avatar-size-lg: 44px;
   --skeleton-line: 12px;
   --focus-ring: 2px;
+  --focus-offset: 2px;
+  --border-accent: 3px;
   --scrollbar-width: 8px;
 }
