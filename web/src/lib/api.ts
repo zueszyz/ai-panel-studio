@@ -25,6 +25,25 @@ export class ApiError extends Error {
   }
 }
 
+/** 把后端的统一错误体转成 ApiError（SSE 通道也复用这一层）。 */
+export async function toApiError(response: Response): Promise<ApiError> {
+  const text = await response.text()
+  if (!text) {
+    return new ApiError(response.status, 'INTERNAL_ERROR', copy.errors.unknown)
+  }
+  try {
+    const body = JSON.parse(text) as ErrorBody
+    return new ApiError(
+      response.status,
+      body.error?.code ?? 'INTERNAL_ERROR',
+      body.error?.message ?? copy.errors.unknown,
+      body.error?.details,
+    )
+  } catch {
+    return new ApiError(response.status, 'INTERNAL_ERROR', copy.errors.unknown)
+  }
+}
+
 function toQuery(params?: Record<string, string | number | boolean | undefined | null>): string {
   if (!params) {
     return ''
@@ -66,20 +85,12 @@ async function request<T>(
     return undefined as T
   }
 
-  const text = await response.text()
-  const payload = text ? (JSON.parse(text) as unknown) : undefined
-
   if (!response.ok) {
-    const body = payload as ErrorBody | undefined
-    const code = body?.error?.code ?? 'INTERNAL_ERROR'
-    throw new ApiError(
-      response.status,
-      code,
-      body?.error?.message ?? copy.errors.unknown,
-      body?.error?.details,
-    )
+    throw await toApiError(response)
   }
-  return payload as T
+
+  const text = await response.text()
+  return (text ? (JSON.parse(text) as unknown) : undefined) as T
 }
 
 export const api = {

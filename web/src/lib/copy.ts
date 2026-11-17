@@ -65,6 +65,9 @@ export const copy = {
   panel: {
     title: '组局',
     analysisTitle: '议题分析',
+    goalLabel: '本场目标',
+    disputesLabel: '争议焦点',
+    anglesLabel: '关注视角',
     analysisPending: '正在拆解争议焦点与需要覆盖的视角…',
     seatsTitle: '席位',
     seatsPending: '专家正在入席…',

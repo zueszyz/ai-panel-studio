@@ -26,7 +26,7 @@ export function relativeTime(iso: string, now: Date = new Date()): string {
   const yesterday = new Date(now)
   yesterday.setDate(now.getDate() - 1)
   if (target.toDateString() === yesterday.toDateString()) {
-    return `昨天 ${absoluteTime(iso)}`
+    return `昨天 ${pad(target.getHours())}:${pad(target.getMinutes())}`
   }
   if (diff < 7 * DAY) {
     return `${Math.floor(diff / DAY)} 天前`

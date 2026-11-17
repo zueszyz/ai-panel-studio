@@ -55,6 +55,7 @@ export interface DiscussionListResponse {
 }
 
 export interface TopicAnalysis {
+  goal?: string | null
   disputes: string[]
   angles: string[]
   audience?: string[]
@@ -87,6 +88,7 @@ export interface ClaimResponse {
 }
 
 export interface PanelAnalysisEvent {
+  goal?: string
   disputes: string[]
   angles: string[]
   audience?: string[]
