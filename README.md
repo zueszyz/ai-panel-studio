@@ -3,7 +3,7 @@
 > 输入一个议题，召集一场由 AI 专家组成、你可以随时插话的圆桌讨论。
 > 不是"问一句答一句"，而是**主持人开场 → 专家并行发言 → 相互质疑 → 你加入辩论 → 收敛成纪要**。
 
-![status](https://img.shields.io/badge/status-docs%20phase-yellow) ![stack](https://img.shields.io/badge/stack-TypeScript%20%2B%20Node.js-blue) ![db](https://img.shields.io/badge/db-PostgreSQL%2016-336791) ![license](https://img.shields.io/badge/license-MIT-green)
+![status](https://img.shields.io/badge/status-docs%20phase-yellow) ![stack](https://img.shields.io/badge/stack-Spring%20Boot%203%20%2B%20Vue%203-blue) ![jdk](https://img.shields.io/badge/jdk-17-orange) ![db](https://img.shields.io/badge/db-SQLite%203-003B57) ![license](https://img.shields.io/badge/license-MIT-green)
 
 ---
 
@@ -26,81 +26,136 @@
 | Agent 行动轨迹 | 实时时间线：谁在思考、谁在发言、谁在等谁，技术细节可折叠 |
 | 观点溯源 | 每条观点标注「发言者 + 轮次 + 时间」，可跳回上下文 |
 | 会议纪要 | 讨论结束后按角色结构化输出，含分歧点与待验证假设，JSON 落库可复盘 |
-| 全程流式 | SSE 单连接多路复用，多 Agent 并行输出互不阻塞，单个 Agent 失败不拖垮全场 |
+| 全程流式 | 单条 SSE 连接多路复用，多 Agent 并行输出互不阻塞，单个 Agent 失败不拖垮全场 |
 
-## 3. 技术选型
+## 3. 技术栈
 
-| 层 | 选型 | 理由 |
+### 3.1 既定前提（项目强制约束）
+
+| 项 | 版本 | 说明 |
 | --- | --- | --- |
-| 前端 | 原生 TypeScript + 手写 CSS（无 UI 框架 / 无组件库） | 硬性约束；手写保证视觉与交互可控 |
-| 后端 | Node.js 22 + TypeScript + Fastify | 长连接与流式 IO 友好，类型贯穿前后端 |
-| 实时通道 | SSE（`text/event-stream`） | 单向推送足够，比 WS 更易穿透代理、易调试 |
-| 编排 | 自研 Orchestrator（回合调度 + 并行 fan-out） | 多 Agent 调度是本题核心考点，不交给框架黑盒 |
-| 数据 | PostgreSQL 16 + Prisma | 需要 JSONB 存结构化纪要，事务与索引更接近生产 |
-| 测试 | Vitest（单测）+ Playwright（E2E） | 覆盖 3 条端到端主链路 |
-| 部署 | Docker Compose（web + db 一键起） | 交付要求 |
+| **后端框架** | **Spring Boot 3.5.16** | 基于 Jakarta EE 9+，全量 `jakarta.*` 命名空间 |
+| **JDK** | **17（LTS）** | 无虚拟线程（Loom 需 21），线程模型必须显式规划 |
+| **前端框架** | **Vue 3.4** | Composition API + `<script setup>` + TypeScript |
+| **数据库** | **SQLite 3.40+** | 单文件、零运维；WAL 模式；单写者 |
+| 构建 | Maven 3.9（后端） / pnpm 8（前端） | |
 
-选型取舍详见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
+### 3.2 在此之上补齐的选型
+
+| 层 | 选型 | 为什么是它 |
+| --- | --- | --- |
+| Web 层 | Spring MVC（Tomcat）+ `SseEmitter` | 数据访问是阻塞式的（MyBatis + SQLite），MVC 更顺；80 路 SSE 用线程池足够，不必上 WebFlux |
+| 实时通道 | SSE，**单连接按 `messageId` 多路复用** | 单向推送足够；比 WebSocket 易调试、易穿透代理 |
+| 多 Agent 编排 | **自研** `SessionActor` + `CompletableFuture` + `Semaphore` | 调度正确性是本题评分重点，不交给 Spring AI 黑盒链 |
+| 数据访问 | MyBatis-Plus 3.5.12（`mybatis-plus-spring-boot3-starter`）+ HikariCP | SQLite 方言简单可控；`JacksonTypeHandler` 直接映射 JSON 字段 |
+| 数据库迁移 | Flyway 11（Boot 3.5 管理版本；`V1__schema.sql` …） | 启动即迁移，重复执行幂等 |
+| 参数校验 | Jakarta Validation + 统一 `@RestControllerAdvice` | 错误码与 API 文档一致 |
+| 接口文档 | springdoc-openapi 2.x（Swagger UI） | 注解即文档，与 `docs/API.md` 双向对齐 |
+| 日志/观测 | Logback + logstash-encoder（JSON）+ MDC + Actuator | `discussionId/agentId` 需跨异步线程传递（`TaskDecorator`） |
+| 前端工程 | Vite 5 + Pinia 2 + Vue Router 4 | 轻、快；**不引任何 UI 组件库**（硬性要求，全部手写 CSS） |
+| 前端流式 | `fetch` + `ReadableStream` 自解析 SSE | `EventSource` 不能自定义请求头（需要 `X-Device-Id`） |
+| 测试 | JUnit 5 + MockMvc + WireMock + Playwright | WireMock 注入 LLM 故障；Playwright 跑 3 条 E2E |
+| 部署/运行 | **本地原生运行，不使用 Docker**：`mvn spring-boot:run` + `pnpm dev`，或打包成单个 jar | 数据库就是 SQLite 文件，没有需要编排的服务；少一层容器 = 少一层流式代理的坑 |
+
+### 3.3 JDK 17 带来的两个真实约束
+
+1. **没有虚拟线程**：每个 agent 的流式读取占一个平台线程。所以 `agentExecutor`（core 8 / max 16 / queue 200）与 `Semaphore(3)/场`、`Semaphore(20)/全局` 必须显式设计，不能靠 Loom 兜底。
+2. **异步线程丢失 MDC**：`SseEmitter` + 线程池会让 `discussionId` 从日志里消失，必须用 `TaskDecorator` 复制 MDC，否则线上排障等于瞎跑。
+
+SQLite 与并发模型带来的约束（单写者、WAL、`busy_timeout`）见 [DATABASE](docs/DATABASE.md) §1 与 [ARCHITECTURE](docs/ARCHITECTURE.md) §3.6。
+
+选型取舍与替代方案（为什么不用 WebFlux / Spring AI / JPA / PostgreSQL）详见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §4。
 
 ## 4. 目录结构
 
 ```text
 ai-panel-studio/
-├── docs/                     # 全部设计与交付文档（先于代码）
-│   ├── PRD.md                # 产品需求文档
-│   ├── ARCHITECTURE.md       # 技术架构与并发/流式设计
-│   ├── DATABASE.md           # 数据库设计 + ER 图
-│   ├── API.md                # 接口契约 + SSE 事件协议
-│   ├── TESTING.md            # E2E 用例与验收清单
-│   ├── PROJECT_PLAN.md       # 任务拆解、里程碑、commit 规划
-│   └── PROMPT_LOG.md         # Prompt / 工具调用留痕
-├── apps/
-│   ├── web/                  # 前端（原生 TS + CSS）
-│   └── server/               # 后端（Fastify + Orchestrator）
-├── packages/shared/          # 前后端共享类型与 SSE 事件定义
-├── db/                       # schema、迁移、seed
-├── e2e/                      # Playwright 用例
-├── docker-compose.yml
+├── docs/                          # 设计文档（先于代码）
+│   ├── PRD.md                     # 产品需求文档
+│   ├── ARCHITECTURE.md            # 架构 + 并发/流式设计
+│   ├── DATABASE.md                # 数据库设计 + ER 图
+│   ├── API.md                     # 接口契约 + SSE 事件协议
+│   ├── TESTING.md                 # E2E 用例与验收清单
+│   ├── PROJECT_PLAN.md            # 里程碑 + commit 规划
+│   └── PROMPT_LOG.md              # Prompt / 工具调用留痕
+├── server/                        # Spring Boot 3 · JDK 17 · Maven
+│   ├── pom.xml
+│   └── src/main/
+│       ├── java/com/panelstudio/
+│       │   ├── api/               # controller · dto · sse(SseEmitter 注册表) · advice
+│       │   ├── application/       # discussion / panel / minutes 用例服务
+│       │   ├── orchestrator/      # SessionActor · TurnScheduler · AgentRunner · ContextBuilder
+│       │   ├── domain/            # entity · policy(SpeakerPolicy) · statemachine
+│       │   ├── infra/             # llm · mapper(MyBatis-Plus) · config · logging
+│       │   └── PanelStudioApplication.java
+│       └── resources/
+│           ├── application.yml
+│           ├── db/migration/      # Flyway: V1__schema.sql / V2__indexes.sql / V3__seed.sql
+│           └── mapper/            # MyBatis XML（复杂查询）
+├── web/                           # Vue 3 · TS · Vite
+│   ├── src/
+│   │   ├── pages/                 # lobby / panel / live / minutes
+│   │   ├── components/            # seat-card · message-bubble · trace-panel · composer
+│   │   ├── stores/                # Pinia: discussion / messages / traces
+│   │   ├── lib/                   # api.ts · sse.ts · format.ts
+│   │   └── styles/                # tokens.css · layout.css · pages/*.css
+│   └── vite.config.ts
+├── e2e/                           # Playwright
+├── scripts/                       # dev.sh/dev.bat · build.sh/build.bat（纯本机脚本，无容器）
+├── data/                          # SQLite 文件（gitignore）
 └── README.md
 ```
 
-> 当前处于 **docs 阶段**：`apps/` 与代码尚未落地，文档先行是为了把"需求拆解 → 契约 → 数据模型"固化下来，后续编码严格按契约推进。
+> 当前处于 **docs 阶段**：`server/` 与 `web/` 尚未落地。文档先行是为了把"需求拆解 → 契约 → 数据模型"固化，编码严格按契约推进。
 
 ## 5. 快速开始（代码落地后可用）
 
-```bash
-git clone <repo-url> ai-panel-studio && cd ai-panel-studio
-cp .env.example .env          # 填入 LLM_API_KEY / LLM_BASE_URL / DATABASE_URL
-docker compose up -d          # 一键起 db + server
-pnpm db:push && pnpm db:seed  # 初始化 7 张表与演示数据
-pnpm dev                      # web:5173  server:8787
-```
+> **不使用 Docker / 容器 / nginx**。数据库是 SQLite 文件，没有需要编排的服务，全部走本机命令与脚本。
 
-本地不依赖 Docker 时：
+前置：JDK 17（`JAVA_HOME` 已配置）、Maven 3.9、Node 20 + pnpm 8。
 
 ```bash
-pnpm i && pnpm db:up && pnpm dev
+cp .env.example .env        # 填 LLM_API_KEY / LLM_BASE_URL（可选 SQLITE_PATH）
+
+# 开发模式：后端 8080 + 前端 5173（Vite 代理 /api）
+./scripts/dev.sh            # Windows: scripts\dev.bat
 ```
+
+等价于手动两条命令：
+
+```bash
+mvn -f server/pom.xml spring-boot:run     # 启动即执行 Flyway 迁移
+pnpm -C web install && pnpm -C web dev    # http://localhost:5173
+```
+
+演示模式（单进程，交付/录视频用这一条）：
+
+```bash
+./scripts/build.sh          # 构建 web/dist → 复制到 server 静态目录 → mvn package
+java -jar server/target/panel-studio.jar  # http://localhost:8080
+```
+
+`application.yml` 已配置 SQLite 连接参数（WAL / `busy_timeout` / `foreign_keys`），无需手工建库 —— 首次启动会在 `data/panel-studio.db` 自动建表并写入演示数据。备份：`sqlite3 data/panel-studio.db "VACUUM INTO 'data/backup.db'"`。
 
 ## 6. 文档索引
 
 | 文档 | 你会看到什么 |
 | --- | --- |
-| [PRD](docs/PRD.md) | 定位、用户与痛点、功能需求 FR-1~FR-9（含验收标准）、非功能需求、状态机、风险 |
-| [架构](docs/ARCHITECTURE.md) | 分层图、回合调度时序、SSE 多路复用、失败隔离与降级、可观测性 |
-| [数据库](docs/DATABASE.md) | ER 图、7 张表字段字典、索引与状态枚举、初始化脚本说明 |
-| [API](docs/API.md) | 12 个接口契约、SSE 事件表、错误码 |
-| [测试](docs/TESTING.md) | 3 条 E2E 主链路 + 降级用例 + 验收清单 |
-| [计划](docs/PROJECT_PLAN.md) | 里程碑、任务拆解、30+ commit 切分方案 |
-| [留痕](docs/PROMPT_LOG.md) | Prompt 记录模板、AI 生成 / 人工修改边界 |
+| [PRD](docs/PRD.md) | 定位、用户与痛点、技术栈约束、功能需求 FR-1~FR-9（含验收标准）、状态机、风险 |
+| [架构](docs/ARCHITECTURE.md) | 分层图、回合调度时序、SSE 多路复用、JDK 17 线程模型、失败隔离、选型取舍 |
+| [数据库](docs/DATABASE.md) | SQLite 设计取舍、ER 图、7 张表字段字典、索引与 PRAGMA、Flyway 脚本 |
+| [API](docs/API.md) | 17 个接口契约、13 类主事件流 SSE 事件 + 4 类组局流事件、错误码 |
+| [测试](docs/TESTING.md) | 5 条 E2E + 12 条集成用例、WireMock 故障注入、验收矩阵 |
+| [计划](docs/PROJECT_PLAN.md) | 里程碑、WBS、30+ commit 切分方案 |
+| [留痕](docs/PROMPT_LOG.md) | Prompt 记录、技术栈变更决策、AI 生成 / 人工修改边界 |
 
 ## 7. AI 工具使用说明
 
 本项目在 `CodeBuddy` 内完成，全程保留 Prompt 与工具调用记录（见 [PROMPT_LOG.md](docs/PROMPT_LOG.md)）。原则：
 
 - **文档与契约由 AI 起草、人工评审后定稿**；需求取舍、并发模型、失败策略以人工判断为准。
-- **代码由 AI 生成后逐文件 Review**，关键路径（Orchestrator 调度、SSE 生命周期、事务边界）人工改写并补测试。
-- 每份文档与每个模块在 commit message 中标注是 `ai-gen` / `ai-gen+human-edit` / `human`。
+- **代码由 AI 生成后逐文件 Review**，关键路径（`SessionActor` 调度、`SseEmitter` 生命周期、SQLite 事务边界）人工改写并补测试。
+- 每份文档与每个模块在 commit message 中标注 `ai-gen` / `ai-gen+human-edit` / `human`。
 
 ## 8. License
 
