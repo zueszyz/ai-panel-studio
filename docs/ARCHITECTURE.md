@@ -6,7 +6,7 @@
 | 关联 | [PRD](PRD.md) · [DATABASE](DATABASE.md) · [API](API.md) |
 | 一句话 | Spring Boot 3.5.16（JDK 17）后端 + Vue 3 前端 + SQLite 单文件库；后端用一个「圆桌会话 Actor」持有全部调度状态，通过单条 SSE 连接把多 Agent 的并行流式输出多路复用到前端。 |
 
-**技术栈（既定）**：Spring Boot **3.5.16** · JDK 17 · Spring MVC + `SseEmitter` · MyBatis-Plus 3.5.12 · Flyway 11 · SQLite 3.40+ · Maven 3.9 · Vue 3.4 + TypeScript + Vite 5 + Pinia 2 + Vue Router 4（无 UI 组件库）· JUnit 5 + WireMock + Playwright · **本地原生运行（不使用 Docker）**。
+**技术栈（既定）**：Spring Boot **3.5.16** · JDK 17 · Spring MVC + `SseEmitter` · MyBatis-Plus 3.5.12 · Flyway 11 · SQLite 3.40+ · Maven 3.9 · Vue 3.4 + TypeScript + Vite 5 + Pinia 2 + Vue Router 4（**手写 UI，无组件库**）· JUnit 5 + WireMock + Playwright · **本地原生运行（不使用 Docker）**。
 
 ---
 
@@ -283,7 +283,7 @@ SQLite 的写操作是**全库串行**的，多 agent 同时结束消息会撞 `
 | LLM 调用 | `WebClient` 手写流式解析 + JSON 模式 | Spring AI `ChatClient` | 需要精确控制 abort / 首 token 超时 / 单席位模型差异；适配层接口保留，后续可替换 |
 | ORM | MyBatis-Plus | Spring Data JPA (Hibernate) | Hibernate 的 SQLite 方言属社区维护，JSON/部分索引支持别扭；MyBatis-Plus 的 `JacksonTypeHandler` 处理 JSON 字段更直接，SQL 可控 |
 | 数据库 | **SQLite 3（WAL）** | PostgreSQL / MySQL | 项目既定。零运维、单文件、随包分发，评审一条命令就能跑；代价是单写者与无水平扩展 —— 用短事务 + 单条 UPDATE + 重试兜住，并在 DATABASE.md 写明迁移到 PG 的路径 |
-| 前端 | Vue 3.4 + 手写 CSS | React / Element Plus / Naive UI | 项目既定 Vue 3；**作业硬性要求禁止 UI 组件库**，三色席位与三栏布局用手写 CSS 反而更精确 |
+| 前端 | Vue 3.4 + **手写 CSS**（无组件库） | React / **Element Plus** / Naive UI / Ant Design Vue | 项目既定 Vue 3。组件库评估见 [ADR-001](UI_ADR.md)：**技术上可用，但不采用** —— ①作业明文禁止且点名 Element Plus；②三色席位、消息流、轨迹时间线都没有现成组件，组件库只覆盖约 30% 界面；③中文 UI 需要文案与排版控制，组件库反而多一层默认英文与设计语言 |
 | 状态管理 | Pinia 2 | Vuex / 自建 eventBus | Vue 3 官方推荐，模块化清晰；流式消息用 `Map<messageId, Bubble>` 存，配合 rAF 合批 |
 | 前端 SSE | `fetch` + `ReadableStream` | 原生 `EventSource` | `EventSource` **不能设置请求头**（本项目要带 `X-Device-Id`），也不能主动 abort；自解析约 80 行，换来完整控制 |
 | 测试 | JUnit 5 + MockMvc + WireMock + Playwright | Postman / 纯手工 | 后端用例离线可跑（WireMock 造故障），E2E 覆盖真实浏览器 |
@@ -336,7 +336,7 @@ ai-panel-studio/
 │   ├── src/pages/{Lobby,Panel,Live,Minutes}.vue
 │   ├── src/components/{SeatCard,MessageBubble,TracePanel,Composer,Dialogs}*.vue
 │   ├── src/stores/{discussion,messages,traces}.ts
-│   ├── src/lib/{api,sse,format}.ts
+│   ├── src/lib/{api,sse,format,copy}.ts          # copy.ts = 中文文案常量
 │   └── src/styles/{tokens,layout,pages}.css
 ├── e2e/                                           # playwright.config.ts + specs
 ├── scripts/                                       # dev.sh/dev.bat/build.sh/build.bat（无容器，纯本机脚本）
