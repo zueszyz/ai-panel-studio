@@ -36,7 +36,7 @@
 | --- | --- | --- |
 | **后端框架** | **Spring Boot 3.5.16** | 基于 Jakarta EE 9+，全量 `jakarta.*` 命名空间 |
 | **JDK** | **17（LTS）** | 无虚拟线程（Loom 需 21），线程模型必须显式规划 |
-| **前端框架** | **Vue 3.4** | Composition API + `<script setup>` + TypeScript |
+| **前端框架** | **Vue 3.4** | Composition API + `<script setup>` + TypeScript；界面**全中文**；**不引入任何 UI 组件库**（Element Plus / Element 的评估与不采用理由见 [UI 决策](docs/UI_ADR.md)） |
 | **数据库** | **SQLite 3.40+** | 单文件、零运维；WAL 模式；单写者 |
 | 构建 | Maven 3.9（后端） / pnpm 8（前端） | |
 
@@ -52,7 +52,9 @@
 | 参数校验 | Jakarta Validation + 统一 `@RestControllerAdvice` | 错误码与 API 文档一致 |
 | 接口文档 | springdoc-openapi 2.x（Swagger UI） | 注解即文档，与 `docs/API.md` 双向对齐 |
 | 日志/观测 | Logback + logstash-encoder（JSON）+ MDC + Actuator | `discussionId/agentId` 需跨异步线程传递（`TaskDecorator`） |
-| 前端工程 | Vite 5 + Pinia 2 + Vue Router 4 | 轻、快；**不引任何 UI 组件库**（硬性要求，全部手写 CSS） |
+| 前端工程 | Vite 5 + Pinia 2 + Vue Router 4 | 轻、快；UI 全部手写（`styles/tokens.css` 定义三色/间距/字号），**零组件库依赖**，包体最小、视觉完全可控 |
+| 中文 UI | 自研文案层 `lib/copy.ts`（按钮/空态/错误/提示统一口径）+ `format.ts`（"3 分钟前"、`2026-11-17 16:32`） | 界面无英文残留、无中英混排；术语统一（议题/席位/回合/纪要），不依赖组件库默认英文文案 |
+| 无障碍 | 中文 `aria-label`、`aria-live="polite"` 节流播报、键盘可达 | 流式输出不刷屏；读屏用户能听清"谁在说话" |
 | 前端流式 | `fetch` + `ReadableStream` 自解析 SSE | `EventSource` 不能自定义请求头（需要 `X-Device-Id`） |
 | 测试 | JUnit 5 + MockMvc + WireMock + Playwright | WireMock 注入 LLM 故障；Playwright 跑 3 条 E2E |
 | 部署/运行 | **本地原生运行，不使用 Docker**：`mvn spring-boot:run` + `pnpm dev`，或打包成单个 jar | 数据库就是 SQLite 文件，没有需要编排的服务；少一层容器 = 少一层流式代理的坑 |
@@ -93,14 +95,14 @@ ai-panel-studio/
 │           ├── application.yml
 │           ├── db/migration/      # Flyway: V1__schema.sql / V2__indexes.sql / V3__seed.sql
 │           └── mapper/            # MyBatis-Plus 自定义 XML（仅复杂聚合）
-├── web/                           # Vue 3 · TS · Vite
+├── web/                           # Vue 3 · TS · Vite（UI 全部手写，无组件库）
 │   ├── src/
 │   │   ├── pages/                 # lobby / panel / live / minutes
-│   │   ├── components/            # seat-card · message-bubble · trace-panel · composer
+│   │   ├── components/            # seat-card · message-bubble · trace-panel · composer · dialog
 │   │   ├── stores/                # Pinia: discussion / messages / traces
-│   │   ├── lib/                   # api.ts · sse.ts · format.ts
+│   │   ├── lib/                   # api.ts · sse.ts · format.ts · copy.ts（中文文案常量）
 │   │   └── styles/                # tokens.css · layout.css · pages/*.css
-│   └── vite.config.ts
+│   └── vite.config.ts             # /api 代理（无组件库按需插件）
 ├── e2e/                           # Playwright
 ├── scripts/                       # dev.sh/dev.bat · build.sh/build.bat（纯本机脚本，无容器）
 ├── data/                          # SQLite 文件（gitignore）
@@ -149,6 +151,7 @@ java -jar server/target/panel-studio.jar  # http://localhost:8080
 | [测试](docs/TESTING.md) | 5 条 E2E + 12 条集成用例、WireMock 故障注入、验收矩阵 |
 | [计划](docs/PROJECT_PLAN.md) | 里程碑、WBS、30+ commit 切分方案 |
 | [留痕](docs/PROMPT_LOG.md) | Prompt 记录、技术栈变更决策、AI 生成 / 人工修改边界 |
+| [UI 决策](docs/UI_ADR.md) | Element Plus / Element 可行性评估、为何不采用、中文 UI 规范 |
 | [交付](docs/DELIVERY.md) | 11 项硬性要求逐条对照、打包结构、视频分镜、邮件模板、评分自检 |
 
 ## 7. AI 工具使用说明
