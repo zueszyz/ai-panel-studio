@@ -54,6 +54,34 @@ await shoot(mobile, '01-lobby-mobile', async (page) => {
   await page.waitForSelector('[data-testid="discussion-card"]')
 })
 
+// 四档断点：确认没有横向滚动条，并补 1920 / 1024 两张截图（放在自建圆桌之前，保持列表干净）
+const breakpoints = [
+  { width: 1920, height: 1080, name: '01-lobby-wide' },
+  { width: 1440, height: 900, name: null },
+  { width: 1024, height: 768, name: '01-lobby-tablet' },
+  { width: 390, height: 844, name: null },
+]
+
+for (const point of breakpoints) {
+  const context = await newContext({ width: point.width, height: point.height })
+  const page = await context.newPage()
+  await page.goto(base, { waitUntil: 'networkidle' })
+  await page.waitForSelector('[data-testid="discussion-card"]')
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  )
+  if (overflow > 0) {
+    console.error(`横向溢出 ${overflow}px @ ${point.width}`)
+    process.exitCode = 1
+  }
+  if (point.name) {
+    await page.screenshot({ path: `${outDir}/${point.name}.png` })
+    console.log(`saved ${outDir}/${point.name}.png`)
+  }
+  console.log(`no horizontal overflow @ ${point.width}px`)
+  await context.close()
+}
+
 // 组局：自建一场圆桌 → 预设阵容生成 → 认领一个席位 → 截图
 const api = await desktop.request
 const headers = { 'X-Device-Id': deviceId }
