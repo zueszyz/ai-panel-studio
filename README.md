@@ -28,6 +28,27 @@
 | 会议纪要 | 讨论结束后按角色结构化输出，含分歧点与待验证假设，JSON 落库可复盘 |
 | 全程流式 | 单条 SSE 连接多路复用，多 Agent 并行输出互不阻塞，单个 Agent 失败不拖垮全场 |
 
+### 2.1 多 Agent 是怎么协作的
+
+不是"一个大模型演四个角色"，而是**四个独立的 Agent 实例 + 一个显式的调度器**：
+
+1. **席位分工**：生成阶段为每个席位写入互不相同的 `stance`（立场）与 `focus`（关注点），主持人没有立场，只负责推进；专家被要求"先回应再主张，禁止附和"。
+2. **主持人调度**：`SpeakerPolicy` 是纯函数，按"被用户点名 > 被引用未回应 > 与用户输入关键词相关 > 久未发言"打分，本回合取 top 2~3；主持人另由调度器触发开场与每两回合收束。
+3. **并行发言**：同回合内多个 `AgentRunner` 通过 `CompletableFuture` 并发执行，各自独立 `WebClient` 流与独立 `messageId`，任一路慢都不阻塞其他路；每场 `Semaphore(3)`、全局 `Semaphore(20)` 控制并发上限。
+4. **收敛**：所有发言落库后，`MinutesService` 按席位聚合主张、抽取分歧对、标注待验证假设，产出可溯源的六段纪要。
+
+技术细节（时序图、失败隔离矩阵）见 [ARCHITECTURE](docs/ARCHITECTURE.md) §3.2。
+
+### 2.2 三个核心页面（交付截图位置）
+
+| 页面 | 路由 | 交付要求 |
+| --- | --- | --- |
+| 讨论列表 | `/` | 至少 1 张截图（含进行中/已结束状态、席位头像组） |
+| 讨论详情 | `/discussions/:id` | 至少 1 张截图（**必须能看出两路并行流式**） |
+| 会议纪要 | `/discussions/:id/minutes` | 至少 1 张截图（六段结构 + 溯源入口） |
+
+截图存放在 `docs/screenshots/`，命名 `01-lobby.png` / `02-live.png` / `03-minutes.png`，并在此处嵌入。
+
 ## 3. 技术栈
 
 ### 3.1 既定前提（项目强制约束）
@@ -36,9 +57,18 @@
 | --- | --- | --- |
 | **后端框架** | **Spring Boot 3.5.16** | 基于 Jakarta EE 9+，全量 `jakarta.*` 命名空间 |
 | **JDK** | **17（LTS）** | 无虚拟线程（Loom 需 21），线程模型必须显式规划 |
-| **前端框架** | **Vue 3.4** | Composition API + `<script setup>` + TypeScript；界面**全中文**；**不引入任何 UI 组件库**（Element Plus / Element 的评估与不采用理由见 [UI 决策](docs/UI_ADR.md)） |
-| **数据库** | **SQLite 3.40+** | 单文件、零运维；WAL 模式；单写者 |
+| **前端框架** | **Vue 3.4** | Composition API + `<script setup>` + TypeScript；界面**全中文**；**UI 由项目手写，不引入 UI 组件库**（自选，不是作业限制 —— 见下方说明） |
+| 数据库（作业限定） | **SQLite 3.40+** | 作业明确要求数据库用 SQLite；单文件、WAL 模式、单写者 |
 | 构建 | Maven 3.9（后端） / pnpm 8（前端） | |
+
+> **框架边界（现行作业说明）**：「**前端及后端框架不限，选择你最擅长的即可**」，只约定数据库用 SQLite。所以 Vue 3、Spring Boot 合规，**Element Plus 一类组件库也不违规**。
+>
+> 本项目仍选择手写 UI，是**技术选型结论**而非被迫：
+> - 核心界面（三色席位卡、流式消息气泡、轨迹时间线、席位状态点）**没有任何现成组件**，组件库最多覆盖按钮/弹窗约 30%；
+> - 中文 UI 需要 100% 文案可控，组件库默认英文 + 需挂 locale 仍有残留；
+> - 评分点包含"像在旁观一场演播厅讨论"，组件库默认观感偏后台管理系统，调和成本高于手写。
+>
+> Element（Vue 2 版）因只支持 Vue 2，与 Vue 3.4 不兼容，技术上已出局。完整对比、成本估算与"未来若引入组件库"的迁移路径见 [UI 决策 ADR-001](docs/UI_ADR.md)。
 
 ### 3.2 在此之上补齐的选型
 
@@ -67,6 +97,36 @@
 SQLite 与并发模型带来的约束（单写者、WAL、`busy_timeout`）见 [DATABASE](docs/DATABASE.md) §1 与 [ARCHITECTURE](docs/ARCHITECTURE.md) §3.6。
 
 选型取舍与替代方案（为什么不用 WebFlux / Spring AI / JPA / PostgreSQL）详见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §4。
+
+### 3.4 架构一览
+
+```mermaid
+flowchart LR
+    subgraph B["浏览器 · Vue 3（UI 全手写）"]
+        P["pages<br/>列表 / 组局 / 圆桌 / 纪要"]
+        S["Pinia stores"]
+        E["lib/sse.ts<br/>fetch 解析 SSE"]
+    end
+    subgraph A["Spring Boot 3.5.16 · JDK 17"]
+        C["api 层<br/>Controller + SseEmitter"]
+        O["orchestrator<br/>SessionActor / 调度 / AgentRunner"]
+        M["MyBatis-Plus"]
+        L["LlmClient"]
+    end
+    DB[("SQLite · WAL")]
+    LLM["LLM Provider"]
+    P --> C
+    P --> E
+    E -->|"GET /stream"| C
+    C --> O
+    C --> M
+    O --> L
+    O --> M
+    M --> DB
+    L --> LLM
+```
+
+分层职责、回合调度时序、SSE 多路复用与失败隔离矩阵见 [ARCHITECTURE](docs/ARCHITECTURE.md)。
 
 ## 4. 目录结构
 
@@ -148,10 +208,11 @@ java -jar server/target/panel-studio.jar  # http://localhost:8080
 | [架构](docs/ARCHITECTURE.md) | 分层图、回合调度时序、SSE 多路复用、JDK 17 线程模型、失败隔离、选型取舍 |
 | [数据库](docs/DATABASE.md) | SQLite 设计取舍、ER 图、7 张表字段字典、索引与 PRAGMA、Flyway 脚本 |
 | [API](docs/API.md) | 17 个接口契约、13 类主事件流 SSE 事件 + 4 类组局流事件、错误码 |
-| [测试](docs/TESTING.md) | 5 条 E2E + 12 条集成用例、WireMock 故障注入、验收矩阵 |
+| [测试](docs/TESTING.md) | 5 条 E2E + 15 条集成用例、WireMock 故障注入、验收矩阵 |
 | [计划](docs/PROJECT_PLAN.md) | 里程碑、WBS、30+ commit 切分方案 |
 | [留痕](docs/PROMPT_LOG.md) | Prompt 记录、技术栈变更决策、AI 生成 / 人工修改边界 |
-| [UI 决策](docs/UI_ADR.md) | Element Plus / Element 可行性评估、为何不采用、中文 UI 规范 |
+| [UI 决策](docs/UI_ADR.md) | Element Plus / Element 可行性分析、为何不采用、中文 UI 规范 |
+| [工作流程](docs/WORKFLOW.md) | 六段开发流程、工具与权限边界、3 个典型问题、效率台账 |
 | [交付](docs/DELIVERY.md) | 11 项硬性要求逐条对照、打包结构、视频分镜、邮件模板、评分自检 |
 
 ## 7. AI 工具使用说明
