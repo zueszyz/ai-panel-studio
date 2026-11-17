@@ -6,8 +6,11 @@
 | 协议 | HTTP/1.1 + SSE（`text/event-stream`） |
 | 编码 | JSON（UTF-8）；SSE 每条 `data:` 为一个 JSON 对象 |
 | 身份 | 请求头 `X-Device-Id: <uuid>`（前端首次生成并持久化，服务端据此 upsert `users`） |
-| 版本 | v1，路径不带版本号；破坏性变更时升 `/api/v2` |
-| 接口数 | 15（REST 13 + SSE 2），满足 ≥8 的要求 |
+| 文档版本 | v1.1（实现栈：Spring Boot 3.5.16 / JDK 17 / SQLite） |
+| 路径版本 | v1，路径不带版本号；破坏性变更时升 `/api/v2` |
+| 实现 | Spring MVC `@RestController` + `SseEmitter`；DTO 用 `record` + Jakarta Validation；错误统一由 `@RestControllerAdvice` 输出 |
+| 在线文档 | springdoc-openapi 2.x → `GET /swagger-ui.html`（与本文档双向对齐，注解即契约） |
+| 接口数 | 17（REST 14 + SSE 3），满足 ≥8 的要求 |
 
 ---
 
@@ -87,7 +90,7 @@ GET /api/discussions?status=LIVE&q=推荐&mine=true&cursor=dk_2f8a1c&limit=20
 ```
 
 - 排序：`LIVE` 优先，再按 `updatedAt` 倒序。
-- `q` 走 `pg_trgm` 模糊匹配议题；`mine=true` 过滤"我参与的"。
+- `q` 走 `LIKE '%'||?||'%'` 模糊匹配议题（SQLite 无 `pg_trgm`；数据量小，全表扫足够；后续可换 FTS5 trigram）；`mine=true` 过滤"我参与的"。
 
 ### 2.3 `POST /discussions/:id/panel` 生成席位（SSE）
 
@@ -260,6 +263,24 @@ Connection: keep-alive
 X-Accel-Buffering: no
 ```
 
+### 3.0 服务端实现约定（Spring Boot 3.5.16）
+
+```java
+@GetMapping(value = "/discussions/{id}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+public SseEmitter stream(@PathVariable String id, @RequestHeader("X-Device-Id") String deviceId) {
+    SseEmitter emitter = new SseEmitter(0L);          // 0 = 永不超时
+    sseRegistry.register(id, emitter);                // onCompletion/onTimeout/onError 反注册
+    return emitter;                                   // 不可再写 ResponseEntity 包装
+}
+```
+
+- 单帧写：`emitter.send(SseEmitter.event().id(seq).name("message.delta").data(payload, MediaType.APPLICATION_JSON))`。
+- 必须配 `spring.mvc.async.request-timeout=-1`，否则讨论进行到一半被容器掐断。
+- 关闭压缩：`server.compression.mime-types` 中不含 `text/event-stream`（压缩会攒包，流式变"一次性吐出"）。
+- delta 由 `AgentRunner` 按 60–80ms 合并后发送：`ResponseBodyEmitter` 内部有写锁，高频多线程 `send` 会互相排队。
+- 心跳由单线程 `@Scheduled(fixedRate = 15000)` 统一发送注释帧（不是每连接一个线程）。
+- `onError`/`onCompletion` 只反注册，**不取消生成**；用户重连后靠 `snapshot` + `Last-Event-ID` 补齐。
+
 ### 3.1 通用事件结构
 
 ```ts
@@ -303,6 +324,7 @@ sse.on('message.delta', ({ messageId, seq, text }) => {
 
 - 只保证**单条消息内** delta 有序；跨 agent 不排序（并行本就无序，排序会牺牲首 token）。
 - 前端按 `message.start` 到达顺序分配展示槽位，**先到先占位**，避免"后开始的 agent 插到上面"造成跳动。
+- 客户端用 `fetch` + `ReadableStream` 自解析（`EventSource` 不能设置请求头，无法带 `X-Device-Id`；也不能主动 `abort`）。解析器需处理跨 chunk 截断的行（缓冲到 `\n\n` 再切帧）。
 
 ### 3.4 断线与续传
 
