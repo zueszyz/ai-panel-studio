@@ -487,33 +487,109 @@ CREATE UNIQUE INDEX ux_participant_seat           ON discussion_participants (di
 
 ---
 
-## 6. MyBatis-Plus 映射要点
+## 6. 数据访问层：MyBatis-Plus 约定
+
+> **数据访问统一使用 MyBatis-Plus 3.5.12**（`mybatis-plus-spring-boot3-starter`），不使用 MyBatis 原生 `SqlSession` 手工装配，也不使用 Spring Data JPA。理由：SQLite 无官方 JPA 方言，Hibernate 对 JSON/部分索引支持别扭；MyBatis-Plus 在"简单 CRUD 零 SQL + 复杂查询可写 XML/`@Select`"之间正好平衡，且 `JacksonTypeHandler` 能直接吃下 JSON 字段。
+
+### 6.1 依赖与配置
+
+```xml
+<dependency>
+  <groupId>com.baomidou</groupId>
+  <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+  <version>3.5.12</version>
+</dependency>
+<dependency>
+  <groupId>org.xerial</groupId>
+  <artifactId>sqlite-jdbc</artifactId>
+</dependency>
+```
 
 ```java
-@TableName(value = "minutes", autoResultMap = true)
+@Configuration
+@MapperScan("com.panelstudio.infra.mapper")
+public class MybatisPlusConfig {
+    @Bean
+    MybatisPlusInterceptor interceptor() {
+        MybatisPlusInterceptor i = new MybatisPlusInterceptor();
+        i.addInnerInterceptor(new PaginationInnerInterceptor(DbType.SQLITE));  // 分页方言
+        i.addInnerInterceptor(new OptimisticLockerInnerInterceptor());         // @Version（纪要版本等）
+        return i;
+    }
+
+    @Bean
+    MetaObjectHandler metaObjectHandler() {                                    // created_at / updated_at 自动填充
+        return new MetaObjectHandler() {
+            public void insertFill(MetaObject m) {
+                strictInsertFill(m, "createdAt", String.class, Timestamps.now());
+                strictInsertFill(m, "updatedAt", String.class, Timestamps.now());
+            }
+            public void updateFill(MetaObject m) {
+                strictUpdateFill(m, "updatedAt", String.class, Timestamps.now());
+            }
+        };
+    }
+}
+```
+
+### 6.2 实体映射
+
+```java
+@TableName(value = "minutes", autoResultMap = true)   // autoResultMap 必须开，否则 typeHandler 查询不回填
 public class MinuteEntity {
-    @TableId(type = IdType.INPUT)          // 应用层生成 mn_ + ULID
+    @TableId(type = IdType.INPUT)                     // 应用层生成 mn_ + ULID
     private String id;
     private String discussionId;
     private Integer version;
     private String contentMd;
 
     @TableField(value = "structured_json", typeHandler = JacksonTypeHandler.class)
-    private MinuteStructured structured;   // 自动 JSON 序列化/反序列化
+    private MinuteStructured structured;              // 自动 JSON 序列化/反序列化
 
     private String status;
+    @TableField(fill = FieldFill.INSERT)  private String createdAt;
+    @TableField(fill = FieldFill.INSERT_UPDATE) private String updatedAt;
 }
 ```
 
 | 项 | 约定 |
 | --- | --- |
-| 主键 | `TEXT`，应用层 `前缀 + ULID`（`dk_` `st_` `ms_` `mn_` `rn_` `pt_` `ul_`），时间有序，利于游标分页 |
-| JSON 字段 | `@TableField(typeHandler = JacksonTypeHandler.class)` + `autoResultMap = true`（否则查询不回填） |
-| 数组字段 | `focus` 同样用 `JacksonTypeHandler` 存 JSON 数组（不用 SQLite 的 JSON 函数，保持可迁移） |
-| 枚举 | Java `enum` + `@EnumValue` 存 `TEXT` |
-| 软删除 | `@TableLogic` 映射 `deleted_at`（NULL=未删），全局查询自动过滤 |
-| 乐观锁 | `discussions.turn_index` 用 `UPDATE … WHERE turn_index = ?` 做 CAS，防止重复推进回合 |
-| 分页 | `PaginationInnerInterceptor(DbType.SQLITE)` |
+| 主键 | `TEXT`，应用层 `前缀 + ULID`（`dk_` `st_` `ms_` `mn_` `rn_` `pt_` `ul_`），时间有序，利于游标分页；`IdType.INPUT` + 自定义 `IdentifierGenerator` |
+| JSON 字段 | `@TableField(typeHandler = JacksonTypeHandler.class)` + 类上 `autoResultMap = true` |
+| 数组字段 | `focus` 同样 `JacksonTypeHandler` 存 JSON 数组（不用 SQLite JSON 函数，保持可迁移） |
+| 枚举 | Java `enum` + `@EnumValue` 存 `TEXT`；与 DDL 的 `CHECK` 双保险 |
+| 软删除 | `@TableLogic` 映射 `deleted_at`（`NULL`=未删），查询自动追加 `deleted_at IS NULL` |
+| 自动填充 | `MetaObjectHandler` 统一写 `created_at/updated_at`（ISO-8601 UTC 字符串） |
+| 逻辑删除 + 唯一索引 | 注意：软删除后同一 `client_msg_id` 仍占唯一索引；MVP 不做物理复用，冲突即拒绝（语义正确） |
+| 分页 | `PaginationInnerInterceptor(DbType.SQLITE)`；游标分页用手写 `WHERE id > ?`（ULID 有序） |
+
+### 6.3 分层用法（避免 Service 层变 SQL 拼装层）
+
+| 场景 | 用什么 | 示例 |
+| --- | --- | --- |
+| 单表条件查询 | `BaseMapper` + `LambdaQueryWrapper` | 大厅列表：`eq(status).like(topic).orderByDesc(updatedAt)` |
+| 简单写 | `BaseMapper.insert/updateById` | 消息最终态一次 `updateById` |
+| 事务性多步 | `IService` / `ServiceImpl` + `@Transactional` | 结束讨论：改状态 + 写纪要 + 补轨迹 |
+| 复杂聚合 | `@Select` 注解或 `resources/mapper/*.xml` | 轨迹按席位聚合耗时、失败率统计 |
+| 批量 | `saveBatch(list, 50)`（SQLite 单写者，批不宜大） | `agent_runs` 收尾批量落库 |
+
+**几条硬规矩**（写进 code review checklist）：
+
+1. **不在事务里调 LLM**（秒级等待会锁死写锁），也不在 `@Transactional` 方法里做 SSE `send`。
+2. **不使用 `SELECT … FOR UPDATE`**：SQLite 没有行级锁，写了也无效。需要串行化的地方（推进回合）用 **CAS 更新**：`UPDATE discussions SET turn_index = ? WHERE id = ? AND turn_index = ?`，返回 0 行即视为并发冲突并重试。
+3. **禁止 `@TableField(exist = false)` 滥用**：DTO 与 Entity 分离，不把展示字段挂到实体上。
+4. **复杂 SQL 才写 XML**，且 XML 里不出现 SQLite 专有函数（保持可迁移）。
+5. **所有列表查询必须显式分页**，禁止无 `LIMIT` 的 `selectList` 用在接口返回上。
+
+### 6.4 与 SQLite 的配合点
+
+| 点 | 做法 |
+| --- | --- |
+| 写串行 | 依靠短事务 + `busy_timeout`；MyBatis-Plus 的 `saveBatch` 仍在一个事务内，批 ≤50 |
+| 自增主键 | 不用（`AUTOINCREMENT` 会绑死 SQLite），统一 ULID |
+| 类型处理器 | `JacksonTypeHandler` 注册在 `@TableField` 上即可，无需全局注册 |
+| 时间 | 全部 String（ISO-8601），`MetaObjectHandler` 统一生成，避免 JVM 时区漂移 |
+| 迁移 | 只用标准 SQL 语法 + 通用 Wrapper，迁移到 PG 时仅换 `DbType` 与 Flyway 脚本 |
 
 ---
 
