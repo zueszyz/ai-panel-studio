@@ -49,6 +49,15 @@
 
 截图存放在 `docs/screenshots/`，命名 `01-lobby.png` / `02-live.png` / `03-minutes.png`，并在此处嵌入。
 
+已产出（M2，由 `node e2e/screenshot.mjs` 生成）：
+
+| 截图 | 说明 |
+| --- | --- |
+| ![大厅](docs/screenshots/01-lobby.png) | 大厅：进行中 / 待开场 / 已结束三种状态，席位头像组与最后一条发言 |
+| ![发起圆桌](docs/screenshots/01-lobby-dialog.png) | 发起弹层：议题字数实时校验 + 参会人数分段选择 |
+| ![组局](docs/screenshots/02-panel.png) | 组局：议题分析 + 4 张席位卡，含已认领席位（「你」） |
+| ![空态](docs/screenshots/01-lobby-empty.png) | 空态：筛选无结果时给「清空筛选」的下一步 |
+
 ## 3. 技术栈
 
 ### 3.1 既定前提（项目强制约束）
@@ -164,9 +173,10 @@ ai-panel-studio/
 └── README.md
 ```
 
-> 当前处于 **docs 阶段**：`server/` 与 `web/` 尚未落地。文档先行是为了把"需求拆解 → 契约 → 数据模型"固化，编码严格按契约推进。
+> 当前进度：**M1 骨架 + M2（大厅 / 组局）已落地**，`server/` 与 `web/` 可运行（`mvn test` 32 例全绿、`pnpm build` 通过）。
+> M3 讨论内核（`SessionActor` / 并行流式 / 轨迹 / 插话）按 `rules/50` 的模块顺序继续推进，`/discussions/:id` 目前是现场页骨架。
 
-## 5. 快速开始（代码落地后可用）
+## 5. 快速开始
 
 > **不使用 Docker / 容器 / nginx**。数据库是 SQLite 文件，没有需要编排的服务，全部走本机命令与脚本。
 
