@@ -157,3 +157,15 @@ pnpm -C e2e test            # Playwright；失败保留 trace/video
 - 失败保留 `trace: 'retain-on-failure'` + 截图，便于复盘。
 - 顺序（本地/CI 同）：`mvn -q -DskipTests package` → `mvn test` → `pnpm -C web build` → Playwright。
 - 不使用容器：E2E 依赖的"服务"就是本机两个进程 + 内嵌 WireMock。
+
+---
+
+## 7. 交付前自检（打包前必跑）
+
+- [ ] `mvn -f server/pom.xml test` 全绿（单元 + 集成 13 条，含 SQLite 并发写）
+- [ ] `pnpm -C e2e test` 全绿（5 条；若时间紧张，至少 E2E-1/2/3）
+- [ ] 删除 `data/panel-studio.db` 后重启，Flyway 三个脚本自动建库并 seed 成功（证明"数据库初始化脚本"可交付）
+- [ ] `/swagger-ui.html` 可访问，接口数量与 [API](API.md) §1 一致（17 个）
+- [ ] `git log --oneline | wc -l` ≥ 30，且 `docs/git-history.txt` 已导出
+- [ ] 压缩包不包含 `node_modules/`、`server/target/`、`data/`
+- [ ] 录屏用的场景 = E2E-2（两路并行流式），确保视频里能看到"不阻塞"

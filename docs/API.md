@@ -11,6 +11,7 @@
 | 实现 | Spring MVC `@RestController` + `SseEmitter`；DTO 用 `record` + Jakarta Validation；错误统一由 `@RestControllerAdvice` 输出 |
 | 在线文档 | springdoc-openapi 2.x → `GET /swagger-ui.html`（与本文档双向对齐，注解即契约） |
 | 接口数 | 17（REST 14 + SSE 3），满足 ≥8 的要求 |
+| 规模对照 | 支撑 4 个前端路由（`/` `/panel` `/live` `/minutes`）、7 张表；讨论 CRUD / 消息 / SSE 流式 / 汇总四类能力齐全 |
 
 ---
 
