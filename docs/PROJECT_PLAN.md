@@ -13,7 +13,7 @@
 
 | 阶段 | 目标 | 完成标志 | 验收方式 |
 | --- | --- | --- | --- |
-| **M0 文档**（当前） | 需求、架构、数据、契约定稿 | `docs/` 八份文档 + README；每条 FR 有验收标准；技术栈与版本明确；交付清单可勾选 | 对照评分维度自评 |
+| **M0 文档**（当前） | 需求、架构、数据、契约定稿 | `docs/` 九份文档 + README；每条 FR 有验收标准；技术栈与版本明确；交付清单可勾选 | 对照评分维度自评 |
 | **M1 骨架** | 能跑起来的空壳 | `mvn spring-boot:run` 起 8080；Flyway 建出 7 张表（SQLite 文件自动生成）；`/api/health` 200；Vue 起 5173 打通 `/api` 代理；统一异常 + JSON 日志就位 | 本机 smoke + I-1 |
 | **M2 组局** | 议题 → 席位 | 创建圆桌、流式生成席位、认领、进入圆桌；刷新可恢复 | 手动走查 + I-1~I-4 |
 | **M3 讨论** | 多 Agent 并行流式 | 主持人开场、回合调度、并行 delta、轨迹面板、用户插话 | E2E-1 / E2E-2 |
@@ -46,7 +46,7 @@
 - [ ] `PanelStudioApplication`、`AsyncConfig`（`agentExecutor` + `MdcTaskDecorator`）、`MybatisPlusConfig`（分页 + `JacksonTypeHandler`）
 - [ ] `GlobalExceptionHandler`（`@RestControllerAdvice` → 统一错误体）、`TraceIdFilter`（`X-Device-Id` / MDC）
 - [ ] `GET /api/health`（自定义 `LlmHealthIndicator`）、`GET /api/metrics`
-- [ ] Vue：`vite.config.ts`（`/api` 代理）、路由四页占位、`styles/tokens.css`（三色 + 间距 + 字号 + 中文字体栈）、`lib/copy.ts`（中文文案表）、Pinia 初始化；**不引入任何 UI 组件库**（[ADR-001](UI_ADR.md)）
+- [ ] Vue：`vite.config.ts`（`/api` 代理）、路由四页占位、`styles/tokens.css`（三色 + 间距 + 字号 + 中文字体栈）、`lib/copy.ts`（中文文案表）、Pinia 初始化
 - [ ] `scripts/dev.sh` / `dev.bat` / `build.sh` / `build.bat`（**不使用 Docker**）
 - [ ] ESLint + Prettier（web）、Checkstyle（可选）、Playwright 脚手架
 
@@ -167,7 +167,6 @@
 | 53 | `docs: finalize readme with runbook and ai usage notes` `[me]` | M5 |
 
 > 规划 53 条，实际按开发节奏自然增量；最终以 `git log --oneline` 为准（≥30 条）。
-> 补充：UI 方案评估单独提交一条 `docs(adr): evaluate element plus and decide to hand-write ui`，不占用上表编号。
 
 ---
 
@@ -194,7 +193,7 @@
 - [ ] `git log` ≥ 30 条，message 可读，提交粒度合理
 - [ ] README 含运行说明、架构图、AI 使用说明、边界声明与"不使用容器"的说明
 - [ ] 3–5 分钟视频覆盖：大厅 → 组局 → 讨论（并行流式）→ 纪要 → 代码结构讲解
-- [ ] 交付包完整：`README` + `docs/`（8 份） + `docs/git-history.txt` + 视频链接 + 与作业原文的 4 处差异说明
+- [ ] 交付包完整：`README` + `docs/`（9 份） + `docs/git-history.txt` + 视频链接 + 版本差异说明
 
 ---
 

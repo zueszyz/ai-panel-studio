@@ -57,18 +57,11 @@
 | --- | --- | --- |
 | **后端框架** | **Spring Boot 3.5.16** | 基于 Jakarta EE 9+，全量 `jakarta.*` 命名空间 |
 | **JDK** | **17（LTS）** | 无虚拟线程（Loom 需 21），线程模型必须显式规划 |
-| **前端框架** | **Vue 3.4** | Composition API + `<script setup>` + TypeScript；界面**全中文**；**UI 由项目手写，不引入 UI 组件库**（自选，不是作业限制 —— 见下方说明） |
-| 数据库（作业限定） | **SQLite 3.40+** | 作业明确要求数据库用 SQLite；单文件、WAL 模式、单写者 |
+| **前端框架** | **Vue 3.4** | Composition API + `<script setup>` + TypeScript；界面全中文；UI 采用单文件组件 + CSS 设计令牌实现 |
+| **数据库** | **SQLite 3.40+** | 作业要求使用 SQLite；单文件、WAL 模式、单写者 |
 | 构建 | Maven 3.9（后端） / pnpm 8（前端） | |
 
-> **框架边界（现行作业说明）**：「**前端及后端框架不限，选择你最擅长的即可**」，只约定数据库用 SQLite。所以 Vue 3、Spring Boot 合规，**Element Plus 一类组件库也不违规**。
->
-> 本项目仍选择手写 UI，是**技术选型结论**而非被迫：
-> - 核心界面（三色席位卡、流式消息气泡、轨迹时间线、席位状态点）**没有任何现成组件**，组件库最多覆盖按钮/弹窗约 30%；
-> - 中文 UI 需要 100% 文案可控，组件库默认英文 + 需挂 locale 仍有残留；
-> - 评分点包含"像在旁观一场演播厅讨论"，组件库默认观感偏后台管理系统，调和成本高于手写。
->
-> Element（Vue 2 版）因只支持 Vue 2，与 Vue 3.4 不兼容，技术上已出局。完整对比、成本估算与"未来若引入组件库"的迁移路径见 [UI 决策 ADR-001](docs/UI_ADR.md)。
+> UI 实现：页面按 `pages/` 划分，通用块抽到 `components/`，视觉令牌集中在 `styles/tokens.css`（三色、间距、字号、中文字体栈），主题调整只需改一处。
 
 ### 3.2 在此之上补齐的选型
 
@@ -82,8 +75,8 @@
 | 参数校验 | Jakarta Validation + 统一 `@RestControllerAdvice` | 错误码与 API 文档一致 |
 | 接口文档 | springdoc-openapi 2.x（Swagger UI） | 注解即文档，与 `docs/API.md` 双向对齐 |
 | 日志/观测 | Logback + logstash-encoder（JSON）+ MDC + Actuator | `discussionId/agentId` 需跨异步线程传递（`TaskDecorator`） |
-| 前端工程 | Vite 5 + Pinia 2 + Vue Router 4 | 轻、快；UI 全部手写（`styles/tokens.css` 定义三色/间距/字号），**零组件库依赖**，包体最小、视觉完全可控 |
-| 中文 UI | 自研文案层 `lib/copy.ts`（按钮/空态/错误/提示统一口径）+ `format.ts`（"3 分钟前"、`2026-11-17 16:32`） | 界面无英文残留、无中英混排；术语统一（议题/席位/回合/纪要），不依赖组件库默认英文文案 |
+| 前端工程 | Vite 5 + Pinia 2 + Vue Router 4 | 构建轻量、热更新快；组件按业务语义拆分（seat/message/trace），样式集中在设计令牌，便于统一调整 |
+| 中文 UI | 自研文案层 `lib/copy.ts`（按钮/空态/错误/提示统一口径）+ `format.ts`（"3 分钟前"、`2026-11-17 16:32`） | 界面无英文残留、无中英混排；术语统一（议题/席位/回合/纪要） |
 | 无障碍 | 中文 `aria-label`、`aria-live="polite"` 节流播报、键盘可达 | 流式输出不刷屏；读屏用户能听清"谁在说话" |
 | 前端流式 | `fetch` + `ReadableStream` 自解析 SSE | `EventSource` 不能自定义请求头（需要 `X-Device-Id`） |
 | 测试 | JUnit 5 + MockMvc + WireMock + Playwright | WireMock 注入 LLM 故障；Playwright 跑 3 条 E2E |
@@ -102,7 +95,7 @@ SQLite 与并发模型带来的约束（单写者、WAL、`busy_timeout`）见 [
 
 ```mermaid
 flowchart LR
-    subgraph B["浏览器 · Vue 3（UI 全手写）"]
+    subgraph B["浏览器 · Vue 3 SFC"]
         P["pages<br/>列表 / 组局 / 圆桌 / 纪要"]
         S["Pinia stores"]
         E["lib/sse.ts<br/>fetch 解析 SSE"]
@@ -155,14 +148,14 @@ ai-panel-studio/
 │           ├── application.yml
 │           ├── db/migration/      # Flyway: V1__schema.sql / V2__indexes.sql / V3__seed.sql
 │           └── mapper/            # MyBatis-Plus 自定义 XML（仅复杂聚合）
-├── web/                           # Vue 3 · TS · Vite（UI 全部手写，无组件库）
+├── web/                           # Vue 3 · TS · Vite
 │   ├── src/
 │   │   ├── pages/                 # lobby / panel / live / minutes
 │   │   ├── components/            # seat-card · message-bubble · trace-panel · composer · dialog
 │   │   ├── stores/                # Pinia: discussion / messages / traces
 │   │   ├── lib/                   # api.ts · sse.ts · format.ts · copy.ts（中文文案常量）
 │   │   └── styles/                # tokens.css · layout.css · pages/*.css
-│   └── vite.config.ts             # /api 代理（无组件库按需插件）
+│   └── vite.config.ts             # /api 代理
 ├── e2e/                           # Playwright
 ├── scripts/                       # dev.sh/dev.bat · build.sh/build.bat（纯本机脚本，无容器）
 ├── data/                          # SQLite 文件（gitignore）
@@ -210,8 +203,7 @@ java -jar server/target/panel-studio.jar  # http://localhost:8080
 | [API](docs/API.md) | 17 个接口契约、13 类主事件流 SSE 事件 + 4 类组局流事件、错误码 |
 | [测试](docs/TESTING.md) | 5 条 E2E + 15 条集成用例、WireMock 故障注入、验收矩阵 |
 | [计划](docs/PROJECT_PLAN.md) | 里程碑、WBS、30+ commit 切分方案 |
-| [留痕](docs/PROMPT_LOG.md) | Prompt 记录、技术栈变更决策、AI 生成 / 人工修改边界 |
-| [UI 决策](docs/UI_ADR.md) | Element Plus / Element 可行性分析、为何不采用、中文 UI 规范 |
+| [留痕](docs/PROMPT_LOG.md) | Prompt 记录、关键决策、AI 生成 / 人工修改边界 |
 | [工作流程](docs/WORKFLOW.md) | 六段开发流程、工具与权限边界、3 个典型问题、效率台账 |
 | [交付](docs/DELIVERY.md) | 11 项硬性要求逐条对照、打包结构、视频分镜、邮件模板、评分自检 |
 

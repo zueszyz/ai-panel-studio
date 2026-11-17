@@ -4,13 +4,13 @@
 | --- | --- |
 | 依据版本 | **现行版作业说明（演播厅版）**：数据库 SQLite、前后端框架不限、交付物为「源码 + Prompt 记录 + 工作流程说明」 |
 | 用途 | 把"重要规则 5 条 / 交付物 3 项 / 提交方式"逐条落到"在哪、怎么证明" |
-| 关联 | [PRD](PRD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [DATABASE](DATABASE.md) · [API](API.md) · [TESTING](TESTING.md) · [PROMPT_LOG](PROMPT_LOG.md) · [WORKFLOW](WORKFLOW.md) · [UI 决策](UI_ADR.md) |
+| 关联 | [PRD](PRD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [DATABASE](DATABASE.md) · [API](API.md) · [TESTING](TESTING.md) · [PROMPT_LOG](PROMPT_LOG.md) · [WORKFLOW](WORKFLOW.md) |
 | 提交邮箱 | **xulei@wisqwest.com** |
 | 邮件主题 | **【远程作业提交】姓名** |
 | 附件 | zip 包 + 文档（Prompt 记录 + 工作流程说明）+ GitHub/Gitee 仓库邀请 |
 | 截止 | **收到作业后 72 小时** |
 
-> 说明：作业说明存在多个版本（措辞差异见 §7）。本文档以**现行演播厅版**为准；旧版要求（如"严禁 UI 组件库""≥30 次 commit""3–5 分钟视频"）中**不与本版冲突的部分**仍作为加分项保留，冲突部分已按本版修正。
+> 说明：作业说明存在多个版本（措辞差异见 §7）。本文档以**现行版**为准；旧版要求（如"≥30 次 commit""3–5 分钟视频"）中**不与本版冲突的部分**仍作为加分项保留。
 
 ---
 
@@ -19,8 +19,8 @@
 | # | 原文要点 | 本项目的做法 | 证据 |
 | --- | --- | --- | --- |
 | 1 | **禁止"一键生成"**：严禁用单一 Prompt 直接生成整个项目代码，必须体现工程化拆解 | 按"文档 → 骨架 → 组局 → 讨论 → 收敛 → 质量"六段推进，每段独立 Prompt + 人工评审；13 次关键交互与 7 次走偏修正留痕 | [PROMPT_LOG](PROMPT_LOG.md) |
-| 2 | **技术栈**：数据库采用 SQLite；前端及后端框架不限 | SQLite 3.40（WAL）+ MyBatis-Plus + Flyway；Spring Boot 3.5.16 / JDK 17；Vue 3.4（UI 手写） | README §3、[DATABASE](DATABASE.md) |
-| 3 | **原创性**：必须从 0 到 1 创建 | 仓库从空目录初始化，无脚手架模板套用；UI 不使用任何组件库，设计与样式自建 | `git log` 首条为 `chore: init repo` |
+| 2 | **技术栈**：数据库采用 SQLite；前端及后端框架不限 | SQLite 3.40（WAL）+ MyBatis-Plus + Flyway；Spring Boot 3.5.16 / JDK 17；Vue 3.4（SFC + 原生 CSS） | README §3、[DATABASE](DATABASE.md) |
+| 3 | **原创性**：必须从 0 到 1 创建 | 仓库从空目录初始化，未套用脚手架模板；接口、组件与样式均由项目自行组织 | `git log` 首条为 `chore: init repo` |
 | 4 | **工具限制**：主体开发必须使用某一款 Vibe Coding 工具，不能使用浏览器与 AI 的对话 | 全程在 CodeBuddy（终端/IDE 内 Agent）完成；无网页版对话产物 | PROMPT_LOG §7 工具调用记录 |
 | 5 | **利用 AI 工具**：鼓励使用 skills、MCP 优化流程 | 使用文件读写/命令执行/截图裁剪等工具链；结构化产出（md + mermaid）由工具直接落盘，减少复制粘贴损耗 | PROMPT_LOG §7 |
 
@@ -46,7 +46,7 @@
 | --- | --- |
 | 原始核心 Prompt | PROMPT_LOG R-001（需求拆解）、R-003（并发模型）为原始 Prompt 骨架 |
 | **SDD 阶段**：数据建模与 API 契约生成 | R-004（ER/7 表）、R-005（API/SSE 契约）、R-008（SQLite 重设计） |
-| **DDD 阶段**：前端组件与页面生成 | R-012（UI 方案）、R-013（中文 UI 与界面规范）、ADR-001 §6 |
+| **DDD 阶段**：前端组件与页面生成 | R-012（中文 UI 与界面规范）、PRD §8 |
 | **TDD 阶段**：核心逻辑测试用例编写与业务实现 | R-006（E2E/集成用例设计）、TESTING §4（单测清单先于实现） |
 | **E2E 阶段**：端到端测试与质量闭环 | TESTING §2（5 条 E2E）、§7 交付前自检 |
 | 每段 Prompt 后 1–2 句说明（当时意图 / 遇到的挑战 / 如何引导修正） | 每条记录的「目标 + 人工干预 + 结论」三行即为该说明；四范式归组表见 PROMPT_LOG §4.1 |
@@ -70,11 +70,11 @@ ai-panel-studio/                     ← 压缩包根目录（源码与文档同
 ├── README.md                        ← 运行指南 / 环境变量 / 技术选型 / API 列表 / 已完成与改进
 ├── docs/
 │   ├── PRD.md  ARCHITECTURE.md  DATABASE.md  API.md
-│   ├── TESTING.md  PROJECT_PLAN.md  PROMPT_LOG.md  DELIVERY.md  UI_ADR.md  WORKFLOW.md
+│   ├── TESTING.md  PROJECT_PLAN.md  PROMPT_LOG.md  DELIVERY.md  WORKFLOW.md
 │   ├── assets/notice-rules.png      ← 作业要求截图（依据留档）
 │   └── screenshots/                 ← 3 张核心页面截图（列表 / 圆桌 / 纪要）
 ├── server/                          ← Spring Boot 3.5.16（含 Flyway 脚本，含 5 场样例数据）
-├── web/                             ← Vue 3 + TS（手写 UI）
+├── web/                             ← Vue 3 + TS（SFC + 原生 CSS）
 ├── e2e/                             ← Playwright
 ├── scripts/                         ← dev / build（无容器）
 ├── .env.example
@@ -124,9 +124,7 @@ zip -r ai-panel-studio.zip . -x "*/node_modules/*" "*/target/*" "data/*"
 3. 核心 Prompt 记录：docs/PROMPT_LOG.md（13 段，覆盖 SDD / DDD / TDD / E2E 四范式）
 4. 工作流程说明：docs/WORKFLOW.md（1.5 页，含 3 个典型问题与效率台账）
 
-技术栈：Spring Boot 3.5.16 + JDK 17 + Vue 3（UI 手写，无组件库）+ SQLite
-说明：现行作业说明"前端及后端框架不限"，本项目按既定栈实现；UI 不使用组件库属自选
-（理由见 docs/UI_ADR.md），不影响功能与体验要求。
+技术栈：Spring Boot 3.5.16 + JDK 17 + Vue 3 + SQLite
 
 谢谢！
 张三 / 电话 / 邮箱
@@ -145,7 +143,7 @@ zip -r ai-panel-studio.zip . -x "*/node_modules/*" "*/target/*" "data/*"
 | 以演播厅视觉与交互驱动前端组件与状态流转 | 三色席位 + 状态点 + 消息流 + 轨迹时间线；四档响应式、区域独立滚动 | PRD §8、README §2.2 |
 | 核心逻辑遵循 TDD，含完整 E2E | 单测覆盖 SpeakerPolicy/ContextBuilder/状态机；5 条 E2E + 15 条集成 | TESTING §2–§4 |
 | 考察 Prompt 结构化表达与引导 AI 解决工程问题 | 记录含"意图/挑战/修正"；7 条走偏案例（含依据版本搞错） | PROMPT_LOG §3/§5 |
-| UI 是否真的像在旁观一场演播厅讨论 | 席位/轨迹/引用/新发言提示等细节；无"后台管理系统"观感 | UI_ADR §4.4、PRD §8 |
+| UI 是否真的像在旁观一场演播厅讨论 | 席位/轨迹/引用/新发言提示等细节；布局与信息密度贴合讨论场景 | PRD §8 |
 
 ---
 
@@ -153,7 +151,6 @@ zip -r ai-panel-studio.zip . -x "*/node_modules/*" "*/target/*" "data/*"
 
 | 项 | 旧版说明 | 现行版说明 | 本项目执行 |
 | --- | --- | --- | --- |
-| UI 组件库 | 「严禁使用任何 UI 框架/组件库（如 Ant Design、Element Plus）」 | **未限制**（"前端及后端框架不限"） | 自选不采用，理由见 ADR-001 |
 | 数据库 | 未指定 | **SQLite** | SQLite ✅ |
 | 交付物 | 11 项（含 ≥30 commit、≥3 E2E、3–5 分钟视频） | 3 项（源码+文档 / Prompt 记录 ≥5 段 / 工作流程说明） | 以本版为主，旧版数量要求作为加分项超额完成（7 表/17 API/5 E2E/27→53 commit） |
 | 提交 | handshake@gaodun.cn，主题【AI开发实习生-姓名-岗位】 | **xulei@wisqwest.com**，主题【远程作业提交】姓名 | 按现行版 |
