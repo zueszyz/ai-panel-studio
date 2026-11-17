@@ -6,7 +6,7 @@
 | 数据库 | **SQLite 3.40+**（WAL 模式，单文件） |
 | ORM | MyBatis-Plus 3.5.12（`JacksonTypeHandler` 映射 JSON 字段） |
 | 连接池 | HikariCP（`maximumPoolSize=4`，写并发实际为 1） |
-| 迁移 | Flyway 11（`V1__schema.sql` / `V2__indexes.sql` / `V3__seed_demo.sql`） |
+| 迁移 | Flyway 11（`V1__schema.sql` / `V2__indexes.sql` / `V3__seed_demo.sql` / `V4__seed_examples.sql` / `V5__discussion_regen_count.sql`；只增不改） |
 | 表数量 | 7（满足 ≥5 张表的硬性要求） |
 | 命名约定 | 表名复数 snake_case；主键 `id TEXT`（前缀 + ULID）；时间 `TEXT`（ISO-8601 UTC，如 `2026-11-17T08:12:31.482Z`） |
 
@@ -208,6 +208,7 @@ erDiagram
 | `turn_index` | INTEGER | NOT NULL DEFAULT 0 | 已完成回合数 |
 | `topic_analysis` | TEXT | NULL（JSON） | `{"disputes":[],"audience":[],"angles":[]}` |
 | `created_by` | TEXT | FK users, `ON DELETE SET NULL` | |
+| `regen_count` | INTEGER | NOT NULL DEFAULT 0 | 「换一批」已用次数，`V5__discussion_regen_count.sql` 增列；超限返回 `429 REGEN_LIMIT` |
 | `deleted_at` | TEXT | NULL | 软删除；MyBatis-Plus `@TableLogic` |
 
 ### 3.3 `agents` — 席位（含主持人）
@@ -482,9 +483,11 @@ CREATE UNIQUE INDEX ux_participant_seat           ON discussion_participants (di
 
 > SQLite 从 3.8 起支持**部分索引**，所以"一席一人"可以用索引在数据库层保证，而不是靠应用层查一次再写（那种写法在并发下必翻车）。
 
-### 5.5 `V3__seed_demo.sql`
+### 5.5 `V3__seed_demo.sql` / `V4__seed_examples.sql` / `V5__discussion_regen_count.sql`
 
-1 个演示用户、1 场已结束的圆桌（4 席位 / 12 条消息 / 1 份纪要 / 8 条轨迹），保证首次打开列表不是空的，也让 E2E 有一条稳定基线。
+- `V3`：1 个演示用户、1 场已结束的圆桌（4 席位 / 12 条消息 / 1 份纪要 / 8 条轨迹），保证首次打开列表不是空的，也让 E2E 有一条稳定基线。
+- `V4`：5 场预设圆桌（3 场进行中 / 1 场待开场 / 1 场已结束，其中 1 场含六段纪要 + 认领记录），覆盖 AI 技术选型、定价、招聘、产品、内容五个方向，席位立场互补。
+- `V5`：为 `discussions` 增列 `regen_count`，用于「换一批」次数限制（`429 REGEN_LIMIT`）。
 
 ---
 

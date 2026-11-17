@@ -28,7 +28,8 @@
 | 阶段 | 记录数 | AI 参与度 | 主要产出 |
 | --- | --- | --- | --- |
 | M1 骨架 | 1（R-014） | `[ai-gen+edit]` | Maven 工程、Flyway 7 表、异常/日志、health、Vue 壳、脚本 |
-| M2 组局 | — | — | — |
+| M2 大厅 | 1（R-015） | `[ai-gen+edit]` | 列表/创建/详情接口、大厅页四态、5 场示例圆桌 |
+| M2 组局 | 1（R-016） | `[ai-gen+edit]` | LlmClient、逐席流式生成、预设兜底、认领 |
 | M3 讨论 | — | — | — |
 | M4 收敛 | — | — | — |
 | M5 质量 | — | — | — |
@@ -242,6 +243,42 @@
   - `scripts/build.bat` → jar 内置静态资源；`/`、`/discussions/dk_1`、`/discussions/dk_1/panel` 均 200（text/html），`/api/health` 200；
   - 开发模式：Vite 5179 + `/api` 代理 → 页面 200、`/api/health` 200。
 - **结论**：M1 门禁达成。遗留：`flyway-database-sqlite` 的文档描述已修正；生产 JSON 日志待 M5 压测时取样验证。
+
+### R-015 · M2 大厅（2026-11-17 19:40–20:30）
+
+- **阶段**：M2（大厅，模块 2）
+- **目标**：`GET/POST /discussions` + `GET /discussions/{id}` 与列表页四态，门禁 I-1 通过
+- **Prompt（摘要）**：> 按 API.md §2.1/§2.2 与 PRD FR-1 实现大厅：分页限制必须显式、错误码与文档一致、列表页要有骨架/空态/错误/正常四态且符合 rules/20 的 12 条自查。
+- **产出**：`domain/entity`（5 张表实体）、`infra/mapper`（列表 SQL / 最后一条发言 / 我参与的）、`application/DiscussionService`、`api/DiscussionController`、`web/pages/Lobby.vue` + 卡片/弹层/骨架/空态组件、`stores/lobby.ts`、`V4__seed_examples.sql`。
+- **人工决策点** `[me]`：
+  1. **排序含状态优先级 → 不能用 ULID 游标**：改为不透明游标（内部 offset），并限制 `limit ≤ 50`，避免客户端构造分页参数扫全表；
+  2. **`status` 支持逗号分隔集合**：产品需要「进行中」这种分组，比前端发 4 次请求更省；
+  3. **弱文本对比度不达标**：rules/20 给的 `#6F7787` 在卡片底色上约 3.8:1，按要求 ≥4.5:1 提亮到 `#8A93A6`，规则与验收项冲突时以可测量的验收项为准；
+  4. **同屏主按钮**：空态动作降级为次按钮，确保页面只剩「发起圆桌」一个主按钮。
+- **验证方式（命令 + 结果）**：
+  - `mvn -B test` → `DiscussionApiIntegrationTest` 8 例通过（7 字议题 400 + `details[0].field=topic`、人数越界、创建 201、LIVE 优先、状态/关键词筛选、mine 过滤、非法状态 400、详情 404）；
+  - `node e2e/screenshot.mjs` → `docs/screenshots/01-lobby*.png` 四张（桌面/弹层/空态/窄屏），逐张目视检查层级、间距、裁切与断点；
+  - 浏览器走查：发起圆桌 → 300ms 内进入组局页（Playwright 断言 URL）。
+- **结论**：大厅门禁达成。遗留：列表未做虚拟滚动（20 条一页足够，M5 压测再评估）。
+
+### R-016 · M2 组局（2026-11-17 20:30–21:40）
+
+- **阶段**：M2（组局，模块 3）
+- **目标**：议题分析 + 席位逐个流式生成 + 预设兜底 + 认领，门禁 I-2~I-4 通过
+- **Prompt（摘要）**：> 按 API.md §2.3/§2.4 实现组局：席位逐个 SSE 推送、首张要快、单席失败不能拖垮整场、失败要能降级到预设阵容、认领冲突必须由数据库唯一索引兜底。
+- **产出**：`infra/llm`（LlmClient / OpenAiCompatibleClient / JsonRepair / PromptTemplates）、`application/PanelService + PanelParser + PanelPersistService + PresetPanels`、`api/PanelController`、`web/pages/Panel.vue` + `SeatCard.vue` + `lib/sse.ts` + `stores/panel.ts`、`V5__discussion_regen_count.sql`。
+- **人工决策点** `[me]`：
+  1. **一次调用 vs 逐席调用**：选逐席（1 次分析 + N 次生成），换来「首张卡 ~2s」与单席位可重问/可兜底；代价是总调用数变多，用 `max_tokens=800` 控成本；
+  2. **失败不留半截数据**：整场生成完成后单事务落库；失败只发 `panel.failed`，由用户显式点「使用预设阵容」（`preset:true`），而不是服务端偷偷兜底；
+  3. **主持人不可认领**：否则一场圆桌没有调度者，新增 `SEAT_NOT_CLAIMABLE`；
+  4. **SSE 端点不声明 `produces`**：否则错误路径（429/409）无法协商回 JSON；改为让 `SseEmitter` 自己设置 `text/event-stream`，客户端 `Accept` 同时带 `application/json`；
+  5. **SQLite `transaction_mode=IMMEDIATE`**：并发写触发 `BUSY_SNAPSHOT`（`busy_timeout` 对它无效），改为写事务在 BEGIN 时取写锁。
+- **验证方式（命令 + 结果）**：
+  - `mvn -B test` → **32 例全绿**：I-2 帧序（analysis → seat.added ×4 → done）、I-3 幂等（席位 id 不变）、I-4 冲突（409 SEAT_TAKEN / 撤销恢复 ACTIVE / 主持人 409 / 不存在 404）、换一批超限 429、WireMock 脏 JSON（围栏 + 尾逗号 + 前后闲话）能修复、上游 500 → `panel.failed` 且席位数为 0；
+  - 浏览器走查（Playwright，未配 Key 的降级路径）：发起圆桌 → 组局页 → 失败卡 → 点「使用预设阵容」→ 4 张席位卡 → 认领 → **刷新后认领仍在** → 进入圆桌；控制台 0 error；
+  - `node e2e/screenshot.mjs` → `02-panel*.png`（桌面 + 窄屏，含已认领席位）；
+  - 删库重启：`discussions seeded: 6`，首条 `status=LIVE, seats=4`（验证 V1~V5 全部可重放）。
+- **结论**：M2 门禁达成。遗留：`SQLITE_BUSY` 的应用层退避重试（rules/40 §1）暂未实现，靠 `busy_timeout + IMMEDIATE + 短事务` 兜住，M3 并发压测时若仍出现再补，已在 §5 记录。
 
 ---
 

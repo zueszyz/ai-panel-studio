@@ -91,16 +91,18 @@ GET /api/discussions?status=LIVE&q=推荐&mine=true&cursor=dk_2f8a1c&limit=20
 ```
 
 - 排序：`LIVE` 优先，再按 `updatedAt` 倒序。
-- `q` 走 `LIKE '%'||?||'%'` 模糊匹配议题（SQLite 无 `pg_trgm`；数据量小，全表扫足够；后续可换 FTS5 trigram）；`mine=true` 过滤"我参与的"。
+- `q` 走 `LIKE '%'||?||'%'` 模糊匹配议题（SQLite 无 `pg_trgm`；数据量小，全表扫足够；后续可换 FTS5 trigram）；`mine=true` 过滤"我参与的"（需要 `X-Device-Id`，缺失时返回空列表）。
+- `status` 支持逗号分隔的集合，便于「进行中」这类分组查询：`status=LIVE,PANEL_READY,SUMMARIZING,INTERRUPTED`；非法取值返回 `400 VALIDATION_ERROR`。
+- `cursor` 是**不透明字符串**（内部为偏移量）。排序包含状态优先级，无法用 ULID 做纯 id 游标，因此客户端只回传上一页的 `nextCursor`，不解析内容。
 
 ### 2.3 `POST /discussions/:id/panel` 生成席位（SSE）
 
 ```http
 POST /api/discussions/dk_2f8a1c/panel
-Accept: text/event-stream
+Accept: text/event-stream, application/json
 Content-Type: application/json
 
-{ "regenerate": false }
+{ "regenerate": false, "preset": false }
 ```
 
 事件序列（逐个席位到达，前端逐张渲染）：
@@ -122,8 +124,11 @@ data: {"discussionId":"dk_2f8a1c","status":"PANEL_READY","seats":4}
 ```
 
 - `regenerate:true` 时最多 2 次（第 3 次返回 `429 REGEN_LIMIT`），且只替换未被认领的席位。
+- `preset:true` 跳过模型，直接用内置的 3 套预设阵容（离线可用）；`panel.done` 会带 `"fallback":"PRESET"` 表示本次为降级结果。
 - 生成失败：`event: panel.failed` + `data: {"code":"LLM_JSON_INVALID","retriable":true,"fallbackAvailable":true}`；`fallbackAvailable` 为真时前端展示「使用预设阵容」。
-- 幂等：同一讨论已有 `PANEL_READY` 且未要求重生成时，直接推送现有席位后 `panel.done`。
+- 幂等：同一讨论已有 `PANEL_READY` 且未要求重生成时，直接推送现有席位后 `panel.done`（席位 id 不变）。
+- 错误路径（`429 REGEN_LIMIT`、`409`）发生在建立流式响应之前，按统一错误体返回 JSON，因此客户端 `Accept` 需同时包含 `application/json`。
+- 落库时机：席位在生成结束后一次性写入（单事务），中途失败不产生半截席位；`preset` 与模型失败都不会写入脏数据。
 
 ### 2.4 `POST /discussions/:id/claim` 认领席位
 
@@ -138,6 +143,8 @@ POST /api/discussions/dk_2f8a1c/claim
 
 - 撤销：`POST /claim { "seatId": null }` → 恢复 AI 席位（`status=ACTIVE`），历史发言保留。
 - 旁人已认领：`409 SEAT_TAKEN`；席位不存在：`404 SEAT_NOT_FOUND`；讨论已结束：`409 DISCUSSION_CLOSED`。
+- 主持人席位不可认领：`409 SEAT_NOT_CLAIMABLE`（否则一场圆桌没有主持人推进）。
+- 单场仅允许用户占一个席位：认领新席位会自动释放旧席位（同一事务）。
 
 ### 2.5 `POST /discussions/:id/start` 开场
 
@@ -343,12 +350,14 @@ sse.on('message.delta', ({ messageId, seq, text }) => {
 | 400 | `VALIDATION_ERROR` | 参数不合法（带 `details[]`） | 否 |
 | 404 | `DISCUSSION_NOT_FOUND` / `SEAT_NOT_FOUND` / `MINUTES_NOT_FOUND` | 资源不存在 | 否 |
 | 409 | `SEAT_TAKEN` | 席位已被认领 | 否（换席位） |
+| 409 | `SEAT_NOT_CLAIMABLE` | 主持人席位不可认领 | 否 |
 | 409 | `DISCUSSION_NOT_LIVE` / `ALREADY_STARTED` / `DISCUSSION_CLOSED` | 状态不允许 | 否 |
 | 410 | `DISCUSSION_DELETED` | 已软删除 | 否 |
 | 402 | `BUDGET_EXHAUSTED` | 单场 token 预算耗尽 | 否（需结束） |
 | 429 | `LLM_RATE_LIMIT` / `REGEN_LIMIT` | 限流 / 重生成次数上限 | 是（退避） |
 | 504 | `LLM_TIMEOUT` | 模型超时 | 是（单条重试） |
 | 502 | `LLM_JSON_INVALID` / `LLM_UPSTREAM_ERROR` | 上游异常/输出不可解析 | 是 |
+| 503 | `LLM_NOT_CONFIGURED` | 后端未配置 `LLM_API_KEY` / `LLM_BASE_URL` / `LLM_MODEL`，需走预设阵容 | 否（用 preset） |
 | 409 | `DISCUSSION_STATE_INVALID` | 状态机拒绝的迁移（附带 `from` / `to`） | 否 |
 | 500 | `INTERNAL_ERROR` | 未预期异常（不回传堆栈与上游响应体） | 是（稍后） |
 
