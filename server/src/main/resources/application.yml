@@ -19,7 +19,9 @@ spring:
   profiles:
     default: dev
   datasource:
-    url: jdbc:sqlite:${SQLITE_PATH:./data/panel-studio.db}?journal_mode=WAL&synchronous=NORMAL&busy_timeout=5000&foreign_keys=on
+    # transaction_mode=IMMEDIATE：写事务在 BEGIN 时就拿写锁，
+    # 避免「先读后写」升级为 BUSY_SNAPSHOT（busy_timeout 对快照冲突无效）
+    url: jdbc:sqlite:${SQLITE_PATH:./data/panel-studio.db}?journal_mode=WAL&synchronous=NORMAL&busy_timeout=5000&foreign_keys=on&transaction_mode=IMMEDIATE
     driver-class-name: org.sqlite.JDBC
     hikari:
       pool-name: panel-sqlite

@@ -4,7 +4,7 @@ server:
 spring:
   datasource:
     # 每个测试进程一个临时库：Flyway 启动时自动建表，顺带验证迁移脚本可用
-    url: jdbc:sqlite:./target/panel-test-${random.uuid}.db?journal_mode=WAL&synchronous=NORMAL&busy_timeout=5000&foreign_keys=on
+    url: jdbc:sqlite:./target/panel-test-${random.uuid}.db?journal_mode=WAL&synchronous=NORMAL&busy_timeout=5000&foreign_keys=on&transaction_mode=IMMEDIATE
 
 panel:
   llm:
