@@ -112,6 +112,8 @@ WireMock 令 `st_3` 超时（`withFixedDelay(60000)`）。断言：该卡片「�
 | I-11 | SSE 续传 | 带 `Last-Event-ID` 重连 → 不丢不重 |
 | I-12 | 软删除 | 删除后列表不出现；直链 410 |
 | I-13 | SQLite 并发写 | 20 线程并发 `message.end` → 无 `SQLITE_BUSY` 泄漏到接口（重试生效），耗时 P95 < 200ms |
+| I-14 | **多讨论隔离** | 同时开 A/B 两场，向 A 发消息：B 的 `/stream` 收不到任何 A 的事件；两场 `turnIndex` 独立推进；A 的纪要只含 A 的 `messageId` |
+| I-15 | **密钥边界** | 任意响应体、错误信息、`web/dist` 产物中均不含 `sk-` / `apiKey`；前端直连 LLM 域名的请求为 0 条 |
 
 ## 4. 单元测试清单
 
