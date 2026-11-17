@@ -2,10 +2,11 @@
 
 | 项 | 内容 |
 | --- | --- |
-| 版本 | v1.0 |
-| 层次 | 单元（纯函数）→ 集成（API + LLM Mock）→ E2E（Playwright） |
+| 版本 | v1.1（栈：Spring Boot 3.5.16 / JDK 17 / SQLite / Vue 3；不使用容器） |
+| 层次 | 单元（纯 Java 函数）→ 集成（MockMvc + 临时 SQLite）→ E2E（Playwright） |
 | 硬性要求 | E2E ≥ 3 条（本文设计 5 条，前 3 条为必过项） |
-| 原则 | 可重复、可离线（LLM 可 Mock）、断言业务结果而非像素 |
+| 原则 | 可重复、可离线（LLM 用 WireMock 造）、断言业务结果而非像素 |
+| 运行 | 全部本机执行，不需要 Docker |
 
 ---
 
@@ -13,19 +14,45 @@
 
 | 层 | 工具 | 覆盖对象 | 目标 |
 | --- | --- | --- | --- |
-| 单元 | Vitest | `domain/policy/speaker.ts`、`context-builder.ts`、状态机迁移、JSON 修复器 | 策略可解释、边界明确 |
-| 集成 | Vitest + Fastify inject + Prisma test db | 15 个接口的状态码、幂等、事务、SSE 帧序列 | 契约不被破坏 |
-| E2E | Playwright | 真实浏览器 + 真实前后端 + LLM Mock 服务 | 主链路可交付 |
+| 单元 | JUnit 5 + AssertJ + Mockito | `SpeakerPolicy`、`ContextBuilder`、`DiscussionStateMachine`、JSON 修复器、ULID 生成器 | 策略可解释、边界明确、无 IO |
+| 集成 | `@SpringBootTest` + MockMvc + 临时 SQLite（每类一个临时文件）+ WireMock | 17 个接口的状态码、幂等、事务、SSE 帧序列 | 契约不被破坏 |
+| E2E | Playwright（Node） | 真实浏览器 + 真实前后端（`java -jar` 或 `spring-boot:run`）+ WireMock | 主链路可交付 |
+| 前端单测 | Vitest（可选） | SSE 解析器（跨 chunk 截断）、store 去重逻辑 | 流式解析不出错 |
 
 ### 1.1 LLM 如何 Mock（关键）
 
-自建 `mocks/llm-server`：一个 OpenAI 兼容的极简服务，按 `fixtures/*.json` 回放，支持：
+用 **WireMock 3** 内嵌在测试进程里，暴露一个 OpenAI 兼容端点（`/v1/chat/completions`）：
 
-- **按时序流式吐出**（每 60–120ms 一个 chunk），让并行/流式可见、可断言；
-- **可编排故障**：`?fail=st_3` 让指定席位超时、`?fail=json` 让席位生成返回脏 JSON、`?slow=8000` 拉长首 token；
-- **录制模式**：真实调用一次并落盘，后续离线回放（避免测试花钱、避免不稳定）。
+| 能力 | 实现方式 |
+| --- | --- |
+| 流式回放 | `ResponseTemplateTransformer` 拼 `data: {...}\n\n` 帧，`withChunkedDribbleDelay(40, 3000)` 让 token 分 40 片、总时长 3s 吐出 |
+| 单席位变慢 | 按请求体里的 `seatId` 匹配 → `withFixedDelay(8000)`（验证"慢 agent 不阻塞别人"） |
+| 超时 / 429 / 402 | WireMock `Scenario` + `withStatus(429)`，或故意 `withFixedDelay(60000)` 触发客户端 watchdog |
+| 脏 JSON（席位生成） | 返回带 markdown 围栏 / 尾逗号的假 JSON，验证修复器与降级 |
+| 录制回放 | `RecordSpec` 录一次真实响应存为 `*.json`，后续离线回放（不花钱、不抖动） |
 
-`docker-compose.test.yml` 只起 `db + mock-llm + server`，E2E 用 `LLM_BASE_URL=http://mock-llm:9100/v1`。
+```java
+stubFor(post(urlEqualTo("/v1/chat/completions"))
+    .withRequestBody(matchingJsonPath("$.metadata.seatId", equalTo("st_3")))
+    .willReturn(aResponse()
+        .withStatus(200)
+        .withHeader("Content-Type", "text/event-stream")
+        .withChunkedDribbleDelay(40, 8000)     // 慢席位：8s
+        .withBodyFile("llm/slow-seat.stream")));
+```
+
+- 测试 profile：`application-test.yml` 把 `LLM_BASE_URL` 指向 `http://localhost:${wiremock.port}/v1`。
+- 生产/演示：真实 provider；E2E 走 WireMock，保证"3 条用例永远绿"，不因模型抽风而假红。
+
+### 1.2 SQLite 在测试中的处理
+
+| 项 | 做法 |
+| --- | --- |
+| 隔离 | 每个测试类用独立临时库：`jdbc:sqlite:${java.io.tmpdir}/panel-test-${UUID}.db`，`@AfterAll` 删除 |
+| 结构 | 不手工建表：Flyway 在 `@SpringBootTest` 启动时自动迁移（顺带验证脚本可用） |
+| 种子 | 集成测试用 `V3__seed_demo.sql` + 各用例自建数据；E2E 用 API 预置，`afterEach` 清理 |
+| 并发用例 | 串行执行（`@Execution(SAME_THREAD)`），因为 SQLite 单写者会被并行测试互相干扰 |
+| 不需要 | Testcontainers（无独立 DB 服务）、H2（方言不同，测了不算数） |
 
 ---
 
@@ -35,34 +62,34 @@
 
 | 项 | 内容 |
 | --- | --- |
-| 前置 | 空库或种子库；mock 已就绪 |
-| 步骤 | 1. 打开 `/` → 点「发起圆桌」<br>2. 输入议题「我们该不该把推荐系统从规则引擎换成向量召回」<br>3. 选 4 人 → 提交<br>4. 断言进入 `/discussions/:id`，处于"生成中"<br>5. 等待 4 张席位卡出现（逐个浮现）<br>6. 点第 3 张「我来坐这里」<br>7. 点「进入圆桌」 |
-| 断言 | 议题文本在详情页可见；席位数为 4 且含 1 位主持人；席位卡含姓名/岗位/立场；认领后头像变「你」且标识 `已认领`；开场后出现主持人 `OPENING` 消息且流式结束后 `status=done`；URL 未跳走、控制台无 error |
-| 反例 | 议题仅 5 个字时提交按钮禁用并显示字数提示（同用例内追加） |
+| 前置 | 空库或种子库；WireMock 已就绪 |
+| 步骤 | 1. 打开 `/` → 点「发起圆桌」<br>2. 输入议题「我们该不该把推荐系统从规则引擎换成向量召回」<br>3. 选 4 人 → 提交<br>4. 断言进入 `/discussions/:id`，处于"生成中"<br>5. 等待 4 张席位卡逐个浮现<br>6. 点第 3 张「我来坐这里」<br>7. 点「进入圆桌」 |
+| 断言 | 议题在详情页可见；席位 4 个且含 1 位主持人；席位卡含姓名/岗位/立场；认领后头像变「你」并标「已认领」；开场后出现主持人 `OPENING` 消息且流式结束后 `status=done`；控制台无 error |
+| 反例 | 议题仅 5 字时提交按钮禁用并显示字数提示 |
 
 ### E2E-2 用户插话 → 多 Agent 并行流式 → 观点溯源（主链路 B）
 
 | 项 | 内容 |
 | --- | --- |
-| 前置 | 复用 E2E-1 产出的 LIVE 圆桌（或用 seed 的 LIVE 场次） |
-| 步骤 | 1. 在输入框输入「冷启动没有行为数据，向量召回拿什么训练？」并发送<br>2. 观察至少 2 个消息卡片**同时**进入流式<br>3. 记录两张卡首个字符出现的时间差<br>4. 点击某条专家消息的引用徽标 `↩ 回应 你` |
-| 断言 | 用户消息立即上屏（<300ms）；≥2 张卡片处于 streaming 且**交错**收到 delta（不是串行）；首 token 时间差 < 3s；被引用的用户消息被高亮滚动到视口；每条消息可见「第 N 回合 · 时间 · 发言人」；轨迹面板对应席位状态从 `思考中 → 发言中 → 完成` |
-| 关键 | 用 mock 把 A 席位设为 8s 慢响应、B 席位 1s，验证 **B 不被 A 阻塞**（B 的 `message.end` 早于 A 的 `message.end`） |
+| 前置 | 复用 E2E-1 产出的 LIVE 圆桌（或 seed 的 LIVE 场次） |
+| 步骤 | 1. 输入「冷启动没有行为数据，向量召回拿什么训练？」并发送<br>2. 观察 ≥2 张消息卡**同时**进入流式<br>3. 记录两张卡首个字符出现的时间差<br>4. 点击某条专家消息的引用徽标 `↩ 回应 你` |
+| 断言 | 用户消息 <300ms 上屏；≥2 张卡处于 streaming 且 delta **交错**到达（不是串行）；首 token 时间差 < 3s；被引用消息滚动到视口并高亮；每条消息可见「第 N 回合 · 时间 · 发言人」；轨迹面板对应席位从 `思考中 → 发言中 → 完成` |
+| 关键 | WireMock 把 `st_2` 设为 8s 慢响应、`st_4` 为 1s，断言 **`st_4` 的 `message.end` 早于 `st_2`** —— 证明不阻塞 |
 
 ### E2E-3 结束讨论 → 生成纪要 → 刷新持久化（主链路 C）
 
 | 项 | 内容 |
 | --- | --- |
-| 步骤 | 1. 点「结束讨论」→ 二次确认<br>2. 断言输入框禁用、出现「生成纪要」主按钮<br>3. 点生成，等待 6 个分段依次出现<br>4. 打开 `/discussions/:id/minutes`<br>5. **刷新页面**（hard reload）→ 再次断言纪要内容<br>6. 点击纪要中某条要点的「溯源」 |
-| 断言 | 结束后 3s 内 SSE 断开且不再有新消息；纪要六段齐全（议题/主张/分歧/共识/假设/下一步）；刷新后纪要文本与刷新前完全一致（来自 DB）；溯源点击跳回详情页并高亮原消息；复制 Markdown 后剪贴板内容含 `# 圆桌纪要` |
+| 步骤 | 1. 点「结束讨论」→ 二次确认<br>2. 断言输入框禁用、出现「生成纪要」<br>3. 点生成，等 6 个分段依次出现<br>4. 打开 `/discussions/:id/minutes`<br>5. **Hard reload** 后再次断言<br>6. 点某条要点的「溯源」 |
+| 断言 | 结束后 3s 内 SSE 断开且不再有新消息；纪要六段齐全（议题/主张/分歧/共识/假设/下一步）；刷新前后文本完全一致（来自 SQLite 而非前端缓存）；溯源跳回详情页并高亮原消息；复制 Markdown 后剪贴板含 `# 圆桌纪要` |
 
 ### E2E-4 失败降级：单席位超时不影响全场（加分）
 
-mock 令 `st_3` 超时。断言：该卡片显示「发言中断 · 重试」，同回合其他卡片正常 `done`；主持人收束消息仍产生；点重试后该卡片成功（mock 第二次返回正常）。**整场讨论状态仍为 `LIVE`**。
+WireMock 令 `st_3` 超时（`withFixedDelay(60000)`）。断言：该卡片「发言中断 · 重试」，同回合其他卡片正常 `done`；主持人收束仍产生；点重试后成功（`Scenario` 第二次返回正常）；**整场状态仍为 `LIVE`**。
 
 ### E2E-5 断线重连：不丢消息（加分）
 
-在流式过程中用 `page.context().setOffline(true)` 断网 5s 再恢复。断言：出现「连接中断，正在恢复」提示；恢复后本地消息与 DB 一致（条数 + 内容），无重复气泡（`clientMsgId` 幂等生效）。
+流式中用 `page.context().setOffline(true)` 断网 5s 再恢复。断言：「连接中断，正在恢复」提示出现；恢复后本地消息与 DB 一致（条数 + 内容）；无重复气泡（`clientMsgId` 幂等生效）。
 
 ---
 
@@ -72,23 +99,25 @@ mock 令 `st_3` 超时。断言：该卡片显示「发言中断 · 重试」，
 | --- | --- | --- |
 | I-1 | `POST /discussions` 参数校验 | 7 字议题 → 400 且 `details[0].field === 'topic'` |
 | I-2 | `POST /discussions/:id/panel` 帧序列 | 首帧 `panel.analysis`，随后 N 个 `seat.added`，末帧 `panel.done`；顺序稳定 |
-| I-3 | panel 重复调用 | 已有 `PANEL_READY` 时不重建席位（席位 id 不变） |
-| I-4 | `claim` 冲突 | 第二人认领同席位 → 409 `SEAT_TAKEN` |
-| I-5 | `messages` 幂等 | 同 `clientMsgId` 提交两次 → 只有一条消息、只触发一轮调度 |
-| I-6 | 非 LIVE 发言 | `DRAFT` 状态 → 409 `DISCUSSION_NOT_LIVE` |
+| I-3 | panel 重复调用 | 已有 `PANEL_READY` 时席位 id 不变（不重建） |
+| I-4 | `claim` 冲突 | 第二人认领同席位 → 409 `SEAT_TAKEN`（验证部分唯一索引） |
+| I-5 | `messages` 幂等 | 同 `clientMsgId` 两次 → 一条消息、只触发一轮调度 |
+| I-6 | 非 LIVE 发言 | `DRAFT` → 409 `DISCUSSION_NOT_LIVE` |
 | I-7 | `end` 后发言 | 410 `DISCUSSION_CLOSED` |
 | I-8 | minutes 版本 | 连生两次 → `version` 1、2；`?version=1` 可取旧版 |
-| I-9 | minutes 失败不覆盖 | mock 超时 → 旧版仍 `READY`，接口返回 `keptVersion` |
+| I-9 | minutes 失败不覆盖 | WireMock 超时 → 旧版仍 `READY`，响应含 `keptVersion` |
 | I-10 | 预算耗尽 | 打满 `budget` → 402 `BUDGET_EXHAUSTED`，已有消息可读 |
-| I-11 | SSE 续传 | 带 `Last-Event-ID` 重连 → 不丢事件、不重复 |
+| I-11 | SSE 续传 | 带 `Last-Event-ID` 重连 → 不丢不重 |
 | I-12 | 软删除 | 删除后列表不出现；直链 410 |
+| I-13 | SQLite 并发写 | 20 线程并发 `message.end` → 无 `SQLITE_BUSY` 泄漏到接口（重试生效），耗时 P95 < 200ms |
 
 ## 4. 单元测试清单
 
-- `speakerPolicy.pick()`：被点名优先、被引用未回应优先、本回合已发言者降权、K 上限、无候选时回退到"最久未发言"。
-- `contextBuilder`：最近 6 条原文 + 滚动摘要、超长引用截断、token 预算裁剪不破坏引用完整性。
-- `stateMachine`：非法迁移抛错（`CLOSED → LIVE` 拒绝）。
-- `jsonRepair`：markdown 代码块包裹的 JSON、尾逗号、单引号 → 均能修复；修复失败抛 `LLM_JSON_INVALID`。
+- `SpeakerPolicy.pick()`：被点名优先、被引用未回应优先、本回合已发言者降权、K 上限、无候选回退到"最久未发言"、主持人永不入选。
+- `ContextBuilder`：最近 6 条原文 + 滚动摘要、超长引用截断、token 预算裁剪不破坏引用完整性。
+- `DiscussionStateMachine`：非法迁移抛错（`CLOSED → LIVE` 拒绝）、`INTERRUPTED` 双向合法。
+- `JsonRepair`：markdown 围栏包裹、尾逗号、单引号 → 均能修复；修复失败抛 `LLM_JSON_INVALID`。
+- `UlidGenerator`：同毫秒内单调递增（保证 `ORDER BY id` ≈ 时间序）、前缀正确。
 
 ---
 
@@ -105,18 +134,26 @@ mock 令 `st_3` 超时。断言：该卡片显示「发言中断 · 重试」，
 | FR-7 | 六段纪要、落库、版本 | E2E-3 + I-8 / I-9 |
 | FR-8 | 结束即停、软删除 | E2E-3 + I-12 |
 | FR-9 | 超时/限流/断线 | E2E-4 / E2E-5 |
-| 非功能 | 首 token、并发、日志 | `/metrics` + 压测脚本 `scripts/load.ts`（20 场 × 4 agent） |
+| 非功能 | 首 token、并发、日志 | `/api/metrics` + `scripts/load.java`（20 场 × 4 agent 压测） |
 
 ---
 
 ## 6. 执行方式
 
 ```bash
-pnpm test           # 单元 + 集成（vitest，CI 必跑）
-pnpm test:e2e       # Playwright（起 docker-compose.test.yml）
-pnpm test:e2e:ui    # 本地调试
+# 后端：单元 + 集成（Flyway 建临时库，WireMock 内嵌）
+mvn -f server/pom.xml test
+
+# 前端
+pnpm -C web test            # Vitest（SSE 解析器、store）
+
+# E2E：需要先启动后端（WireMock profile）+ 前端
+mvn -f server/pom.xml spring-boot:run -Dspring-boot.run.profiles=e2e
+pnpm -C web dev
+pnpm -C e2e test            # Playwright；失败保留 trace/video
 ```
 
-- E2E 每条用例使用独立 `discussion`（通过 API 预置），互不干扰；`afterEach` 清理。
-- 失败时保留 trace/video（`trace: 'retain-on-failure'`），便于复盘。
-- CI 顺序：`lint → typecheck → unit+integration → build → e2e`。
+- E2E 每条用例自建 `discussion`（走 API 预置），互不干扰；`afterEach` 清理。
+- 失败保留 `trace: 'retain-on-failure'` + 截图，便于复盘。
+- 顺序（本地/CI 同）：`mvn -q -DskipTests package` → `mvn test` → `pnpm -C web build` → Playwright。
+- 不使用容器：E2E 依赖的"服务"就是本机两个进程 + 内嵌 WireMock。
