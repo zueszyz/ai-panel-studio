@@ -6,6 +6,9 @@ node_modules/
 dist/
 build/
 *.tsbuildinfo
+# 演示构建时由 scripts/build 复制进来的前端产物
+server/src/main/resources/static/
+server/target/
 
 # env
 .env

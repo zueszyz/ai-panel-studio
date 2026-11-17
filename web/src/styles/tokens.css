@@ -1,0 +1,98 @@
+/*
+ * 设计令牌：全站唯一允许出现具体数值的地方。
+ * 组件样式必须引用变量，禁止 padding: 13px / border-radius: 7px 这类魔法值。
+ */
+:root {
+  color-scheme: dark;
+
+  /* 背景层级：演播厅感，非纯黑 */
+  --bg: #0b0e13;
+  --surface: #12161d;
+  --card: #171c24;
+  --card-hover: #1d2330;
+  --overlay: rgba(6, 8, 12, 0.72);
+
+  /* 文字：禁止纯白纯黑 */
+  --text: #e6eaf2;
+  --text-secondary: #a8b0bf;
+  --text-muted: #6f7787;
+
+  /* 描边与分隔 */
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.14);
+
+  /* 全站主色只允许 1 个中性主色 + 席位色 */
+  --primary: #7c8cf8;
+  --primary-strong: #6979ef;
+  --primary-soft: rgba(124, 140, 248, 0.14);
+  --danger: #f2685f;
+  --success: #4ade80;
+
+  /* 席位三色 + 主持人 + 用户 */
+  --seat-amber: #e0a03a;
+  --seat-teal: #2fb6a8;
+  --seat-indigo: #7c8cf8;
+  --seat-violet: #a78bfa;
+  --seat-rose: #f472a6;
+  --seat-slate: #8a93a6;
+  --seat-emerald: #4ade80;
+
+  /* 间距 */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* 字号 */
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 15px;
+  --text-lg: 17px;
+  --text-xl: 20px;
+  --text-2xl: 28px;
+
+  /* 行高 */
+  --leading-tight: 1.35;
+  --leading-normal: 1.6;
+  --leading-loose: 1.75;
+
+  /* 圆角 */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+
+  /* 阴影：最多两层，禁止三层堆叠 */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.28);
+  --shadow-2: 0 6px 18px rgba(0, 0, 0, 0.32);
+  --shadow-3: 0 18px 48px rgba(0, 0, 0, 0.42);
+
+  /* 动效 */
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 240ms;
+
+  /* 字体栈 */
+  --font-sans: -apple-system, 'PingFang SC', 'Microsoft YaHei', 'Source Han Sans SC', sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+
+  /* 布局度量 */
+  --layout-seats: 260px;
+  --layout-trace: 360px;
+  --layout-seats-md: 240px;
+  --layout-trace-md: 320px;
+  --layout-seats-sm: 220px;
+  --content-max: 960px;
+  --reading-max: 720px;
+  --header-height: 60px;
+  --status-dot: 6px;
+  --avatar-size: 36px;
+  --avatar-size-lg: 44px;
+  --skeleton-line: 12px;
+  --focus-ring: 2px;
+  --scrollbar-width: 8px;
+}
