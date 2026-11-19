@@ -77,7 +77,7 @@ GET /api/discussions?status=LIVE&q=推荐&mine=true&cursor=dk_2f8a1c&limit=20
   "items": [{
     "id": "dk_2f8a1c",
     "topic": "我们该不该把推荐系统从规则引擎换成向量召回",
-    "createdBy": "usr_7c1f...a9",
+    "createdByMe": true,
     "status": "LIVE",
     "panelSize": 4,
     "turnIndex": 3,
@@ -96,7 +96,7 @@ GET /api/discussions?status=LIVE&q=推荐&mine=true&cursor=dk_2f8a1c&limit=20
 - `q` 走 `LIKE '%'||?||'%'` 模糊匹配议题（SQLite 无 `pg_trgm`；数据量小，全表扫足够；后续可换 FTS5 trigram）；`mine=true` 过滤"我参与的"（需要 `X-Device-Id`，缺失时返回空列表）。
 - `status` 支持逗号分隔的集合，便于「进行中」这类分组查询：`status=LIVE,PANEL_READY,SUMMARIZING,INTERRUPTED`；非法取值返回 `400 VALIDATION_ERROR`。
 - `cursor` 是**不透明字符串**（内部为偏移量）。排序包含状态优先级，无法用 ULID 做纯 id 游标，因此客户端只回传上一页的 `nextCursor`，不解析内容。
-- `createdBy` 是创建者的 `userId`（由 `X-Device-Id` 解析），前端据此只向创建者展示「删除」入口。
+- `createdByMe` 由服务端根据 `X-Device-Id` 解析出的 `userId` 计算：前端据此只向创建者展示「删除」入口，不暴露内部 `userId`。
 
 ### 2.2b `DELETE /discussions/:id` 软删除
 
