@@ -238,7 +238,8 @@ data: {"code":"LLM_TIMEOUT","retriable":true,"keptVersion":1}
 - 首帧 `minutes.section`（`topic`）不依赖模型，先推出去降低等待感；其余五段在模型返回后按顺序推送。
 - 失败**不覆盖**旧版本（`keptVersion` 告知前端仍可查看哪一版）。
 - 后端未配置模型密钥时走**离线摘要**：只从本场真实消息里摘录，`minutes.done` 带 `"fallback":"LOCAL"`，前端以「离线摘要」标注，不伪装成模型结论。
-- 生成成功即把讨论从 `SUMMARIZING` 收敛为 `CLOSED`（已是 `CLOSED` 则跳过）。
+- 生成成功即把讨论从 `SUMMARIZING` 收敛为 `CLOSED`（已是 `CLOSED` 则跳过）；`interim=true` 时不迁移状态。
+- `interim=true` 允许 `LIVE` / `INTERRUPTED` / `SUMMARIZING`，事件带 `interim:true`，前端以「阶段性小结」徽标标注且不作为可切换版本；`GET /minutes` 读不到阶段性小结。
 
 ### 2.10 `GET /discussions/:id/minutes?version=2`
 
@@ -348,7 +349,7 @@ type SseEnvelope<T> = {
 | `message.end` | 消息完成 | `messageId` `content` `tokens` `latencyMs` | 收尾，去掉闪烁光标 |
 | `message.failed` | 失败/中断 | `messageId` `code` `retriable` | 卡片转错误态 + 重试按钮 |
 | `digest.start` | 主持人收束开始 | `messageId` `kind:"DIGEST"` | 作为独立区块渲染 |
-| `minutes.section` | 纪要分段到达 | `section` `md` | 分段渲染，已到达段不阻塞 |
+| `minutes.section` | 纪要分段到达 | `key` `md` `interim` | 分段渲染，已到达段不阻塞 |
 | `discussion.closed` | 讨论结束 | `status` `endedAt` | 关闭输入框，跳转纪要入口 |
 | `error` | 服务端错误 | `code` `message` `retriable` | 顶部提示（不打断阅读） |
 | `ping` | 每 15s | —（注释帧 `: ping`） | 忽略，仅保活 |
