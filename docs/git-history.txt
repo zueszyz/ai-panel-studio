@@ -1,3 +1,10 @@
+188921c 2026-11-19 test(server): wait for the full panel.failed data frame
+8494510 2026-11-19 fix(server): surface upstream rate limiting on the top banner
+421588a 2026-11-19 test(server): cover token budget thresholds (I-10)
+b7ac58a 2026-11-19 test(server): assert API responses carry no model keys (I-15)
+6ae8808 2026-11-19 test(server): cover Last-Event-ID replay (I-11)
+49f9726 2026-11-19 docs(test): sync test counts and I-12 coverage reference
+a7fde58 2026-11-19 docs: refresh exported git history after plan audit
 3408fc9 2026-11-19 docs: audit project plan and record stress metrics
 5783ef5 2026-11-19 test(scripts): add 20-room stress script with metrics snapshot
 83d16eb 2026-11-19 refactor(server): build a rule-based rolling summary for older messages

@@ -115,12 +115,12 @@ WireMock 令 `st_3` 超时（`withFixedDelay(60000)`）。断言：该卡片「�
 | I-7 | `end` 后发言 | 410 `DISCUSSION_CLOSED` |
 | I-8 | minutes 版本 | 连生两次 → `version` 1、2；`?version=1` 可取旧版（`MinutesApiIntegrationTest#shouldVersionMinutes`） |
 | I-9 | minutes 失败不覆盖 | 模型连续返回非 JSON → 旧版仍 `READY`，流里含 `keptVersion`（`#shouldKeepPreviousVersionOnFailure`） |
-| I-10 | 预算耗尽 | 打满 `budget` → 402 `BUDGET_EXHAUSTED`，已有消息可读 |
-| I-11 | SSE 续传 | 带 `Last-Event-ID` 重连 → 不丢不重 |
+| I-10 | 预算耗尽 | 打满 `budget` → 402 `BUDGET_EXHAUSTED`，已有消息可读（阈值由 `TokenBudgetTest` 覆盖，402 出口在 `DiscussionSessionService#postMessage`） |
+| I-11 | SSE 续传 | 带 `Last-Event-ID` 重连 → 不丢不重（`SseReplayIntegrationTest#shouldReplayOnlyFramesAfterCursor`） |
 | I-12 | 软删除 | 删除后列表不出现；直链 410（`DiscussionApiIntegrationTest#shouldSoftDeleteOnlyAsCreator`） |
 | I-13 | SQLite 并发写 | 20 线程并发 `message.end` → 无 `SQLITE_BUSY` 泄漏到接口（重试生效），耗时 P95 < 200ms（`SqliteBusyIntegrationTest#concurrentEndWritesAreSerializedWithoutBusyLeaks`，退避序列由 `SqliteBusyRetryInterceptorTest` 断言） |
 | I-14 | **多讨论隔离** | 同时开 A/B 两场，向 A 发消息：B 的 `/stream` 收不到任何 A 的事件；两场 `turnIndex` 独立推进；A 的纪要只含 A 的 `messageId` |
-| I-15 | **密钥边界** | 任意响应体、错误信息、`web/dist` 产物中均不含 `sk-` / `apiKey`；前端直连 LLM 域名的请求为 0 条 |
+| I-15 | **密钥边界** | 任意响应体、错误信息、`web/dist` 产物中均不含 `sk-` / `apiKey`；前端直连 LLM 域名的请求为 0 条（`ApiHealthIntegrationTest#shouldNotLeakKeys` + `scripts/build.sh` 产物扫描） |
 
 ## 4. 单元测试清单
 
@@ -152,7 +152,7 @@ WireMock 令 `st_3` 超时（`withFixedDelay(60000)`）。断言：该卡片「�
 ## 6. 执行方式
 
 ```bash
-# 后端：单元 + 集成（Flyway 建临时库，WireMock 内嵌，67 例）
+# 后端：单元 + 集成（Flyway 建临时库，WireMock 内嵌，72 例）
 mvn -f server/pom.xml test
 
 # 前端：vue-tsc 类型检查 + 构建（Vitest 未接入，前端行为由 E2E 覆盖）
@@ -174,7 +174,7 @@ pnpm -C e2e test
 
 ## 7. 交付前自检（打包前必跑）
 
-- [ ] `mvn -f server/pom.xml test` 全绿（单元 + 集成 67 条，含 SQLite 并发写）
+- [ ] `mvn -f server/pom.xml test` 全绿（单元 + 集成 72 条，含 SQLite 并发写）
 - [ ] `pnpm -C e2e test` 全绿（5 条，约 35s）
 - [ ] 删除 `data/panel-studio.db` 后重启，Flyway 三个脚本自动建库并 seed 成功（证明"数据库初始化脚本"可交付）
 - [ ] `/swagger-ui.html` 可访问，接口数量与 [API](API.md) §1 一致（19 个）
