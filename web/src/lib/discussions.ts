@@ -37,6 +37,11 @@ export function fetchDiscussion(id: string): Promise<DiscussionDetail> {
   return api.get<DiscussionDetail>(`/discussions/${id}`)
 }
 
+/** 软删除（仅创建者）：成功后该场从列表移除，直链返回 410。 */
+export function deleteDiscussion(id: string): Promise<{ id: string; deleted: boolean }> {
+  return api.del<{ id: string; deleted: boolean }>(`/discussions/${id}`)
+}
+
 export function fetchSeats(id: string): Promise<{ discussionId: string; status: string; seats: Seat[] }> {
   return api.get<{ discussionId: string; status: string; seats: Seat[] }>(`/discussions/${id}/panel`)
 }

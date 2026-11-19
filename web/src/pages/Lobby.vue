@@ -1,16 +1,20 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import AppDialog from '@/components/AppDialog.vue'
 import CreateDiscussionDialog from '@/components/CreateDiscussionDialog.vue'
 import DiscussionCard from '@/components/DiscussionCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { copy } from '@/lib/copy'
+import type { DiscussionSummary } from '@/lib/types'
 import { useLobbyStore, type LobbyFilter } from '@/stores/lobby'
 
 const lobby = useLobbyStore()
 const router = useRouter()
 
 const dialogOpen = ref(false)
+const pendingDelete = ref<DiscussionSummary | null>(null)
+const deleting = ref(false)
 const searchInput = ref(lobby.keyword)
 let searchTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -44,6 +48,19 @@ onBeforeUnmount(() => {
 function onCreated(id: string): void {
   dialogOpen.value = false
   void router.push(`/discussions/${id}/panel`)
+}
+
+async function confirmDelete(): Promise<void> {
+  const target = pendingDelete.value
+  if (!target || deleting.value) {
+    return
+  }
+  deleting.value = true
+  const ok = await lobby.remove(target.id)
+  deleting.value = false
+  if (ok) {
+    pendingDelete.value = null
+  }
 }
 </script>
 
@@ -149,7 +166,12 @@ function onCreated(id: string): void {
 
       <template v-else>
         <div class="grid" data-testid="discussion-grid">
-          <DiscussionCard v-for="discussion in lobby.items" :key="discussion.id" :discussion="discussion" />
+          <DiscussionCard
+            v-for="discussion in lobby.items"
+            :key="discussion.id"
+            :discussion="discussion"
+            @delete="pendingDelete = $event"
+          />
         </div>
         <div v-if="lobby.nextCursor" class="more">
           <button type="button" class="btn" :disabled="lobby.loadingMore" @click="lobby.loadMore()">
@@ -160,6 +182,29 @@ function onCreated(id: string): void {
     </div>
 
     <CreateDiscussionDialog :open="dialogOpen" @close="dialogOpen = false" @created="onCreated" />
+
+    <AppDialog
+      :open="pendingDelete !== null"
+      :title="copy.lobby.deleteTitle"
+      :description="copy.lobby.deleteBody"
+      @close="pendingDelete = null"
+    >
+      <p class="delete-topic">{{ pendingDelete?.topic }}</p>
+      <template #footer>
+        <button type="button" class="btn btn--ghost" @click="pendingDelete = null">
+          {{ copy.common.cancel }}
+        </button>
+        <button
+          type="button"
+          class="btn btn--danger"
+          data-testid="confirm-delete-discussion"
+          :disabled="deleting"
+          @click="confirmDelete"
+        >
+          {{ deleting ? copy.lobby.deleting : copy.lobby.deleteConfirm }}
+        </button>
+      </template>
+    </AppDialog>
   </section>
 </template>
 
@@ -389,6 +434,13 @@ function onCreated(id: string): void {
   .grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+}
+
+.delete-topic {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  word-break: break-word;
 }
 
 @media (max-width: 767px) {

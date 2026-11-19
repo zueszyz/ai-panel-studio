@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { copy, errorMessage } from '@/lib/copy'
 import { ApiError } from '@/lib/api'
-import { createDiscussion, fetchDiscussions } from '@/lib/discussions'
+import { createDiscussion, deleteDiscussion, fetchDiscussions } from '@/lib/discussions'
 import type { DiscussionSummary } from '@/lib/types'
 
 export type LobbyFilter = 'all' | 'ongoing' | 'mine' | 'ended'
@@ -93,6 +93,17 @@ export const useLobbyStore = defineStore('lobby', () => {
     return created.id
   }
 
+  async function remove(id: string): Promise<boolean> {
+    try {
+      await deleteDiscussion(id)
+      await load()
+      return true
+    } catch (err) {
+      error.value = err instanceof ApiError ? errorMessage(err.code, err.message) : copy.errors.network
+      return false
+    }
+  }
+
   return {
     items,
     nextCursor,
@@ -109,5 +120,6 @@ export const useLobbyStore = defineStore('lobby', () => {
     setKeyword,
     clearFilters,
     create,
+    remove,
   }
 })

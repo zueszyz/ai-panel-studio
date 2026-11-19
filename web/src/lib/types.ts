@@ -41,6 +41,7 @@ export interface LastMessage {
 export interface DiscussionSummary {
   id: string
   topic: string
+  createdByMe: boolean
   status: DiscussionStatus
   panelSize: number
   turnIndex: number
@@ -64,6 +65,7 @@ export interface TopicAnalysis {
 export interface DiscussionDetail {
   id: string
   topic: string
+  createdByMe: boolean
   goal: string | null
   status: DiscussionStatus
   panelSize: number

@@ -9,6 +9,7 @@ import { statusDotColor } from '@/lib/seat'
 import type { DiscussionSummary } from '@/lib/types'
 
 const props = defineProps<{ discussion: DiscussionSummary }>()
+const emit = defineEmits<{ delete: [discussion: DiscussionSummary] }>()
 
 /** 还没有席位时直接去组局页，其余进入圆桌现场。 */
 const target = computed(() =>
@@ -35,6 +36,25 @@ const accentStyle = computed(() => ({ '--status-color': statusDotColor(props.dis
       <time class="discussion__time" :datetime="discussion.updatedAt">
         {{ relativeTime(discussion.updatedAt) }}
       </time>
+      <button
+        v-if="discussion.createdByMe"
+        type="button"
+        class="discussion__delete"
+        data-testid="delete-discussion"
+        :aria-label="copy.lobby.delete"
+        :title="copy.lobby.delete"
+        @click.prevent.stop="emit('delete', discussion)"
+      >
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path
+            d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8h5.8l.6-8M7 7v3.5M9 7v3.5"
+            stroke="currentColor"
+            stroke-width="1.3"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </button>
     </header>
 
     <h3 class="discussion__topic truncate-2" :title="discussion.topic">{{ discussion.topic }}</h3>
@@ -108,6 +128,33 @@ const accentStyle = computed(() => ({ '--status-color': statusDotColor(props.dis
   color: var(--text-muted);
   font-size: var(--text-xs);
   white-space: nowrap;
+}
+
+/* 删除入口只在创建者的卡片上出现；点击阻止 RouterLink 跳转 */
+.discussion__delete {
+  display: grid;
+  place-items: center;
+  width: var(--space-6);
+  height: var(--space-6);
+  flex: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  opacity: 0;
+  transition:
+    opacity var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
+}
+
+.discussion:hover .discussion__delete,
+.discussion__delete:focus-visible {
+  opacity: 1;
+}
+
+.discussion__delete:hover {
+  color: var(--danger);
+  background: var(--danger-soft);
 }
 
 .discussion__topic {
