@@ -21,9 +21,10 @@ async function newContext(viewport) {
   return context
 }
 
-async function shoot(context, name, prepare, path = '/') {
+async function shoot(context, name, prepare, path = '/', waitUntil = 'networkidle') {
   const page = await context.newPage()
-  await page.goto(`${base}${path}`, { waitUntil: 'networkidle' })
+  // 现场页挂着一条常驻 SSE，永远不会 networkidle，只能等 DOM 就绪
+  await page.goto(`${base}${path}`, { waitUntil })
   if (prepare) {
     await prepare(page)
   }
@@ -120,5 +121,57 @@ await shoot(
   },
   `/discussions/${discussion.id}/panel`,
 )
+
+// 现场：开场后截三栏（桌面）与单栏 + 横滑席位（窄屏）
+await api.post(`${base}/api/discussions/${discussion.id}/start`, { headers, data: {} })
+
+await shoot(
+  desktop,
+  '03-live',
+  async (page) => {
+    await page.waitForSelector('[data-testid="message-flow"]')
+    await page.waitForTimeout(1200)
+  },
+  `/discussions/${discussion.id}`,
+  'domcontentloaded',
+)
+
+await shoot(
+  mobile,
+  '03-live-mobile',
+  async (page) => {
+    await page.waitForSelector('[data-testid="message-flow"]')
+    await page.waitForTimeout(1200)
+  },
+  `/discussions/${discussion.id}`,
+  'domcontentloaded',
+)
+
+// 纪要：挑一场已有纪要的已结束圆桌（种子数据里必有）
+const closed = await (
+  await api.get(`${base}/api/discussions?status=CLOSED&limit=5`, { headers })
+).json()
+for (const item of closed.items ?? []) {
+  const response = await api.get(`${base}/api/discussions/${item.id}/minutes`, { headers })
+  if (response.ok()) {
+    await shoot(
+      desktop,
+      '04-minutes',
+      async (page) => {
+        await page.waitForSelector('[data-testid="minutes-content"]')
+      },
+      `/discussions/${item.id}/minutes`,
+    )
+    await shoot(
+      mobile,
+      '04-minutes-mobile',
+      async (page) => {
+        await page.waitForSelector('[data-testid="minutes-content"]')
+      },
+      `/discussions/${item.id}/minutes`,
+    )
+    break
+  }
+}
 
 await browser.close()

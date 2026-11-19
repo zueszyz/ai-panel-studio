@@ -1,17 +1,33 @@
-# E2E 用例（M5 落地）
+# E2E 用例（已落地）
 
-按 `docs/TESTING.md` §2 实现 5 条用例，前 3 条为必过项：
+5 条用例对应 `docs/TESTING.md` §2，全部在 `e2e/specs/` 下，跑一条命令即可：
 
-| 编号 | 场景 | 关键断言 |
+```bash
+pnpm -C e2e test     # 约 35s，含启动假模型 / 后端 / 前端
+pnpm -C e2e report   # 失败时看 HTML 报告
+```
+
+| 文件 | 场景 | 关键断言 |
 | --- | --- | --- |
-| E2E-1 | 组局 → 生成席位 → 认领 → 开场 | 4 张席位卡逐个浮现、认领后变「你」、主持人开场消息 `done` |
-| E2E-2 | 插话 → 多 Agent 并行流式 → 溯源 | ≥2 张卡同时 streaming、慢席位的 `message.end` 更晚 |
-| E2E-3 | 结束 → 纪要 → 刷新持久化 | 六段齐全、Hard reload 后一致、溯源可跳转 |
-| E2E-4 | 单席位超时降级 | 失败卡可重试，整场仍 `LIVE` |
-| E2E-5 | 断线重连 | 「连接中断，正在恢复」出现，恢复后与库一致 |
+| `e2e-1-panel.spec.ts` | 发起 → 组局 → 认领 → 进入现场 | 4 张席位卡、主持人席位不可认领、认领后变「你」、开场 `data-status=DONE` |
+| `e2e-2-parallel.spec.ts` | 插话 → 多 Agent 并行流式 | ≥2 条同时 `STREAMING`；周敏先 `DONE` 时陈立仍在流式（慢的不挡快的） |
+| `e2e-3-minutes.spec.ts` | 结束 → 生成纪要 → 刷新 → 溯源 | 六段齐全、硬刷新后内容一致、溯源跳回原发言 |
+| `e2e-4-degrade.spec.ts` | 单席位失败 → 重试 | 只失败一条、卡片给原因与重试、重试后同一 `messageId` 变成 `DONE` 且不新增气泡 |
+| `e2e-5-reconnect.spec.ts` | 事件流连不上 → 恢复 | 「连接中断」横幅出现 → 自动重连后消失 → 快照补齐且无重复气泡 |
 
-约束：
+## 环境怎么来的
 
-- 定位只用 `data-testid` 与中文文案，不用样式 class。
-- 每条用例自建数据，`afterEach` 清理，用例之间不共享 `discussion`。
-- LLM 全部走 WireMock，禁止依赖真实模型。
+`global-setup.ts` 按顺序拉起，跑完自动收尾：
+
+1. `node e2e/mock-llm.mjs` → OpenAI 兼容假模型（`:9099`）；
+2. 删 `e2e/.tmp/e2e.db`，`mvn spring-boot:run` 起后端（`:8080`，Flyway 重建 6 场种子）；
+3. `pnpm -C web dev` 起前端（`:5173`）。
+
+前置：JDK 17 / Maven / pnpm 可用；**8080、5173、9099 未被占用**（先停掉 `scripts/dev`）。
+
+## 约束
+
+- 定位只用 `data-testid` 与中文文案，不用样式 class（样式会随视觉调整变化）。
+- 每条用例自建 `discussion`，用例之间不共享；数据由下一次 globalSetup 删库清理。
+- LLM 全部走假模型，不依赖真实 API Key，也不读取 `.env`。
+- 失败只留截图；trace/video 默认关闭（避免 test-results 下上百个小文件触发批量删除保护）。

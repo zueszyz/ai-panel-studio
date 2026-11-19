@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "playwright test",
+    "pretest": "node clean.mjs",
     "report": "playwright show-report"
   },
   "devDependencies": {
