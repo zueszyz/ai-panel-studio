@@ -22,6 +22,7 @@ const listRef = ref<HTMLElement | null>(null)
 const atBottom = ref(true)
 const newCount = ref(0)
 const highlightId = ref<string | null>(null)
+const activeMessageId = ref<string | null>(null)
 const endDialogOpen = ref(false)
 const traceOpen = ref(false)
 const restarting = ref(false)
@@ -122,6 +123,7 @@ function jumpToLatest(): void {
 function locate(messageId: string): void {
   atBottom.value = false
   traceOpen.value = false
+  activeMessageId.value = messageId
   highlightId.value = messageId
   void nextTick(() => {
     const element = listRef.value?.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`)
@@ -282,6 +284,7 @@ async function restart(): Promise<void> {
             :highlighted="highlightId === message.id"
             @locate="locate"
             @retry="store.retry"
+            @select="activeMessageId = $event"
           />
         </div>
 
@@ -325,6 +328,7 @@ async function restart(): Promise<void> {
         v-if="!compact"
         :runs="store.runs"
         :seats="store.seats"
+        :active-message-id="activeMessageId"
         class="live__trace"
         @locate="locate"
       />
@@ -351,7 +355,13 @@ async function restart(): Promise<void> {
           <h2 class="drawer__title">{{ copy.live.traceTitle }}</h2>
           <button type="button" class="btn btn--sm" @click="traceOpen = false">{{ copy.common.close }}</button>
         </header>
-        <TracePanel :runs="store.runs" :seats="store.seats" class="drawer__body" @locate="locate" />
+        <TracePanel
+          :runs="store.runs"
+          :seats="store.seats"
+          :active-message-id="activeMessageId"
+          class="drawer__body"
+          @locate="locate"
+        />
       </div>
     </div>
   </section>

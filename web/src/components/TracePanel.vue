@@ -7,6 +7,7 @@ import type { RunView, Seat } from '@/lib/types'
 const props = defineProps<{
   runs: RunView[]
   seats: Seat[]
+  activeMessageId?: string | null
 }>()
 
 const emit = defineEmits<{ locate: [messageId: string] }>()
@@ -54,6 +55,7 @@ function phaseLabel(phase: string | null): string {
             v-for="run in group.items"
             :key="run.id"
             class="trace__item"
+            :class="{ 'trace__item--active': Boolean(props.activeMessageId && run.messageId === props.activeMessageId) }"
             :style="{ '--seat-color': seatColor(nameById[run.agentId ?? '']?.colorToken ?? 'slate') }"
           >
             <button
@@ -137,6 +139,12 @@ function phaseLabel(phase: string | null): string {
 
 .trace__item:hover {
   background: var(--card-hover);
+}
+
+/* 点击消息后高亮对应轨迹（FR-5 双向联动） */
+.trace__item--active {
+  background: var(--primary-soft);
+  box-shadow: inset 0 0 0 1px var(--primary-line);
 }
 
 .trace__head {

@@ -12,7 +12,11 @@ const props = defineProps<{
   showRound?: boolean
 }>()
 
-const emit = defineEmits<{ locate: [messageId: string]; retry: [messageId: string] }>()
+const emit = defineEmits<{
+  locate: [messageId: string]
+  retry: [messageId: string]
+  select: [messageId: string]
+}>()
 
 const mine = computed(() => props.message.role === 'USER')
 const isDigest = computed(() => props.message.kind === 'DIGEST')
@@ -53,6 +57,7 @@ const kindLabel = computed(() => {
     :data-message-id="message.id"
     :data-name="mine ? copy.panel.you : message.seatName"
     :data-status="message.status"
+    @click="emit('select', message.id)"
   >
     <header class="bubble__head">
       <SeatAvatar v-if="!mine" :name="message.seatName" :color-token="message.seatColorToken" size="sm" />
