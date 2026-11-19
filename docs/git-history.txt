@@ -1,3 +1,9 @@
+813793c 2026-11-19 docs: document the five-seat flow, claim window and minutes facts
+4c279d4 2026-11-19 test: cover seat reservation, human seats and minutes facts
+8db3aa2 2026-11-19 feat(minutes): add participant facts, export and auto-generate on end
+b950479 2026-11-19 feat(web): pick a seat before generating the AI panel
+8ed5a43 2026-11-19 feat(server): reserve a user-picked seat and auto-start the roundtable
+0cad9eb 2026-11-19 docs: refresh git history export after offline model
 f17e4ec 2026-11-19 docs: sync 80-test count and zero-key verification
 6ff31ce 2026-11-19 docs: document zero-key offline model fallback
 38263ea 2026-11-19 feat(web): describe built-in offline model in user-facing copy
