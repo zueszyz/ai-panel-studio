@@ -77,6 +77,7 @@ GET /api/discussions?status=LIVE&q=推荐&mine=true&cursor=dk_2f8a1c&limit=20
   "items": [{
     "id": "dk_2f8a1c",
     "topic": "我们该不该把推荐系统从规则引擎换成向量召回",
+    "createdBy": "usr_7c1f...a9",
     "status": "LIVE",
     "panelSize": 4,
     "turnIndex": 3,
@@ -95,6 +96,23 @@ GET /api/discussions?status=LIVE&q=推荐&mine=true&cursor=dk_2f8a1c&limit=20
 - `q` 走 `LIKE '%'||?||'%'` 模糊匹配议题（SQLite 无 `pg_trgm`；数据量小，全表扫足够；后续可换 FTS5 trigram）；`mine=true` 过滤"我参与的"（需要 `X-Device-Id`，缺失时返回空列表）。
 - `status` 支持逗号分隔的集合，便于「进行中」这类分组查询：`status=LIVE,PANEL_READY,SUMMARIZING,INTERRUPTED`；非法取值返回 `400 VALIDATION_ERROR`。
 - `cursor` 是**不透明字符串**（内部为偏移量）。排序包含状态优先级，无法用 ULID 做纯 id 游标，因此客户端只回传上一页的 `nextCursor`，不解析内容。
+- `createdBy` 是创建者的 `userId`（由 `X-Device-Id` 解析），前端据此只向创建者展示「删除」入口。
+
+### 2.2b `DELETE /discussions/:id` 软删除
+
+```http
+DELETE /api/discussions/dk_2f8a1c
+X-Device-Id: 7c1f...a9
+```
+
+```json
+// 200
+{ "id": "dk_2f8a1c", "deleted": true }
+```
+
+- 只写 `deleted_at`，不删数据；列表（`GET /discussions`）不再返回，直链（详情 / 席位 / 讨论流 / 纪要）统一返回 `410 DISCUSSION_DELETED`。
+- 仅创建者可删（`createdBy` 与 `X-Device-Id` 解析出的 `userId` 相同），他人返回 `403 FORBIDDEN`；未提供设备头也返回 `403 FORBIDDEN`。
+- 删除会同时停掉该场在内存中的调度并关闭其 SSE 连接；重复删除返回 `410 DISCUSSION_DELETED`。
 
 ### 2.3 `POST /discussions/:id/panel` 生成席位（SSE）
 
@@ -365,6 +383,7 @@ sse.on('message.delta', ({ messageId, seq, text }) => {
 | HTTP | `code` | 含义 | 可重试 |
 | --- | --- | --- | --- |
 | 400 | `VALIDATION_ERROR` | 参数不合法（带 `details[]`） | 否 |
+| 403 | `FORBIDDEN` | 非创建者尝试删除圆桌 / 缺少设备标识 | 否 |
 | 404 | `DISCUSSION_NOT_FOUND` / `SEAT_NOT_FOUND` / `MINUTES_NOT_FOUND` / `MESSAGE_NOT_FOUND` | 资源不存在 | 否 |
 | 409 | `SEAT_TAKEN` | 席位已被认领 | 否（换席位） |
 | 409 | `MESSAGE_NOT_RETRIABLE` / `AGENT_BUSY` | 该消息无需重试 / 席位正在发言 | 是（稍后再试） |
