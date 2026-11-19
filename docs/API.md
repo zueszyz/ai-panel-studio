@@ -407,7 +407,7 @@ sse.on('message.delta', ({ messageId, seq, text }) => {
 | 429 | `LLM_RATE_LIMIT` / `REGEN_LIMIT` | 限流 / 重生成次数上限 | 是（退避） |
 | 504 | `LLM_TIMEOUT` | 模型超时 | 是（单条重试） |
 | 502 | `LLM_JSON_INVALID` / `LLM_UPSTREAM_ERROR` | 上游异常/输出不可解析 | 是 |
-| 503 | `LLM_NOT_CONFIGURED` | 后端未配置 `LLM_API_KEY` / `LLM_BASE_URL` / `LLM_MODEL`，需走预设阵容 | 否（用 preset） |
+| 503 | `LLM_NOT_CONFIGURED` | 后端未配置 `LLM_API_KEY` / `LLM_BASE_URL` / `LLM_MODEL`；`preset:true` 只能生成席位，发言 / 收束 / 纪要仍需模型 | 否（仅席位可用 preset） |
 | 409 | `DISCUSSION_STATE_INVALID` | 状态机拒绝的迁移（附带 `from` / `to`） | 否 |
 | 500 | `INTERNAL_ERROR` | 未预期异常（不回传堆栈与上游响应体） | 是（稍后） |
 | SSE | `DB_WRITE_FAILED` | 消息终态落库失败（重试耗尽）：`message.failed` 携带该 code，前端提示「本条可能未保存」 | 是（单条重试） |
