@@ -453,6 +453,8 @@
 | F-22 | `AgentRunner` 只 catch `LlmException`：终态落库失败时异常被上层 future 吞掉，消息卡在 STREAMING | 用户看到永远"正在生成"，与 FR-9「本条可能未保存」不符 | catch `DataAccessException`，发 `message.failed` + `DB_WRITE_FAILED`，卡片转 FAILED 并可单条重试 | `AgentRunnerTest#shouldReportDbWriteFailure` 断言失败码与事件数 |
 | F-23 | LLM_NOT_CONFIGURED 文案暗示整场可离线跑，实际预设只生成席位 | 按提示操作后发言全失败、纪要 MINUTES_EMPTY | 文案与 API 错误表明确「预设仅席位」，组局失败卡补提示 | web build 通过；文案与 API.md §4 一致 |
 | F-24 | SSE 客户端断开时 IOException 落到全局 handler，试图把 ApiError 写进 text/event-stream 响应，引发 HttpMessageNotWritableException 连锁 ERROR | 日志被噪音淹没（功能不受影响） | IOException 归为客户端断开仅记 debug；响应已提交或为 SSE 时 handler 不再写错误体 | ApiExceptionHandlerTest 断言 SSE 无错误体、普通响应仍 500 |
+| F-25 | 插话延后只重试 3 次 × 300ms，慢席位（假模型 1.8s / 真实首 token 45s）没结束就放弃 | 用户插话被丢弃，现场没有任何回应 | 改为按 messageId 记录 30s 截止时间，期间每 300ms 重排一次 | SessionActorTest + E2E-2 全绿 |
+| F-26 | E2E-2 用 /runs 判断「已收尾」，但轨迹表只在发言结束时写，看不到仍在 inflight 的发言 | 插话时上一轮还占着席位，并行断言偶发红 | 先断言页面没有 STREAMING 气泡，再发插话 | E2E-2 连续两次全绿 |
 
 ---
 
