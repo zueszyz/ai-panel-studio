@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
@@ -97,13 +98,24 @@ public class ApiExceptionHandler {
     /**
      * 客户端断开 SSE 连接：不是服务端故障，只记 debug，避免刷错误日志，也不影响正在进行的生成。
      */
-    @ExceptionHandler(AsyncRequestNotUsableException.class)
-    public void handleClientGone(AsyncRequestNotUsableException ex) {
-        log.debug("SSE 客户端已断开: {}", ex.getMessage());
+    @ExceptionHandler({AsyncRequestNotUsableException.class, java.io.IOException.class})
+    public void handleClientGone(Exception ex) {
+        // 客户端断开 SSE 后写入 socket 会抛 IOException：不是服务端故障，只记 debug。
+        log.debug("客户端已断开: {}", ex.getMessage());
     }
 
+    /**
+     * SSE 响应一旦提交，Content-Type 已是 text/event-stream，无法再写 JSON 错误体。
+     * 此时只记 debug 并结束，避免 HttpMessageNotWritableException 引发连锁 ERROR 日志。
+     */
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiError> handleUnexpected(Exception ex) {
+    public ResponseEntity<ApiError> handleUnexpected(Exception ex,
+                                                     jakarta.servlet.http.HttpServletResponse response) {
+        String contentType = String.valueOf(response.getContentType());
+        if (response.isCommitted() || contentType.contains(MediaType.TEXT_EVENT_STREAM_VALUE)) {
+            log.debug("响应已提交，忽略后续异常: {}", ex.toString());
+            return null;
+        }
         log.error("未预期异常", ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiError.of("INTERNAL_ERROR", "服务内部错误，请稍后重试"));
