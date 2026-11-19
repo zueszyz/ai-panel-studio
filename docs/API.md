@@ -263,8 +263,10 @@ data: {"code":"LLM_TIMEOUT","retriable":true,"keptVersion":1}
 // health
 { "status": "ok", "db": "up", "llm": "up", "uptimeSec": 3821 }
 // metrics（JSON，非 Prometheus 格式）
-{ "sseConnections": 7, "activeSessions": 3, "firstTokenMs": { "p50": 1820, "p95": 4100 }, "agentFailureRate": 0.012 }
+{ "sseConnections": 7, "activeSessions": 3, "firstTokenMs": { "p50": 1820, "p95": 4100 }, "agentFailureRate": 0.012, "sqliteBusy": 2 }
 ```
+
+`sqliteBusy` 是被应用层退避重试消化掉的写锁冲突次数（ARCHITECTURE §3.7）：数值增长说明 SQLite 出现竞争，但请求未失败；持续快速增长才需要检查事务边界。
 
 ---
 

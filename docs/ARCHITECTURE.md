@@ -247,6 +247,10 @@ SQLite 的写操作是**全库串行**的，多 agent 同时结束消息会撞 `
 | SSE 客户端断开 | `onError/onCompletion` | 反注册，**不中断生成** | —（重连快照补齐） |
 | 单实例崩溃 | 启动扫描 | `LIVE` → `INTERRUPTED` | 可「继续」或「出纪要」 |
 
+> `SQLITE_BUSY` 的实现落点：`infra/db/SqliteBusyRetryInterceptor` 在 MyBatis `Executor.update`
+> 外层统一做 50/100/200ms 三次退避重试，只包单条 mapper 写（不包 LLM/SSE），
+> 命中记 `sqlite.busy` 日志并累加 `/metrics` 的 `sqliteBusy`；重试耗尽才向上抛错。
+
 ### 3.8 可观测性
 
 - **结构化日志**：Logback + `logstash-logback-encoder` 输出 JSON；字段 `discussionId / turnId / seatId / messageId / event / latencyMs / tokens`；关键节点 `turn.start`、`agent.invoke`、`agent.first_token`、`agent.done`、`agent.fail`、`sqlite.busy`、`sse.connect`、`sse.disconnect`。

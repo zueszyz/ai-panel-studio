@@ -278,7 +278,7 @@
   - 浏览器走查（Playwright，未配 Key 的降级路径）：发起圆桌 → 组局页 → 失败卡 → 点「使用预设阵容」→ 4 张席位卡 → 认领 → **刷新后认领仍在** → 进入圆桌；控制台 0 error；
   - `node e2e/screenshot.mjs` → `02-panel*.png`（桌面 + 窄屏，含已认领席位）；
   - 删库重启：`discussions seeded: 6`，首条 `status=LIVE, seats=4`（验证 V1~V5 全部可重放）。
-- **结论**：M2 门禁达成。遗留：`SQLITE_BUSY` 的应用层退避重试（rules/40 §1）暂未实现，靠 `busy_timeout + IMMEDIATE + 短事务` 兜住，M3 并发压测时若仍出现再补，已在 §5 记录。
+- **结论**：M2 门禁达成。遗留：`SQLITE_BUSY` 的应用层退避重试（rules/40 §1）暂未实现，靠 `busy_timeout + IMMEDIATE + 短事务` 兜住，M3 并发压测时若仍出现再补，已在 §5 记录（该项已于 R-020 补齐）。
 
 ---
 
@@ -359,6 +359,25 @@
 
 ---
 
+### R-020 · SQLITE_BUSY 应用层退避重试（2026-11-19 17:20–17:40）
+
+- **阶段**：M5（质量）收尾，补齐 R-016 留下的唯一门禁缺口
+- **目标**：把 `ARCHITECTURE §3.7` / `rules/40 §1` / `TESTING I-13` 早已约定、但一直靠 `busy_timeout + IMMEDIATE + 短事务` 兜住的退避重试真正落地。
+- **Prompt（摘要）**：> 按需求与开发文档核对遗留项，实现 SQLITE_BUSY 的应用层退避重试；只补这一项，最小改动，不碰契约、不引依赖、不破坏既有测试。
+- **产出**：`infra/db/SqliteBusyRetryInterceptor`（MyBatis `Executor.update` 外层统一重试 50/100/200ms 三次）；`MetricsService` 增 `sqliteBusy` 计数并进 `/metrics`；`SQLITE_BUSY` 命中记 `sqlite.busy` 日志、对用户静默；`SqliteBusyRetryInterceptorTest`（退避序列/放弃/非锁异常不重试）+ `SqliteBusyIntegrationTest`（I-13 并发写）；同步 `ARCHITECTURE §3.7`、`API §2.12`、`TESTING I-13`。
+- **人工决策点** `[me]`：
+  1. **用 MyBatis 写拦截器而不是在每个 mapper 调用点包一层**：写路径有 17 处，逐点包装必然漏；拦截器天然覆盖所有 insert/update/delete（含 MyBatis-Plus 生成的），且只拦 `Executor.update`，读语句不碰（WAL 下读写互不阻塞）；
+  2. **重试只包单条 mapper 写**：严格遵守「事务里不调 LLM/发 SSE/做等待」，退避发生在写语句外层，不扩大事务边界；
+  3. **识别扩展锁码**：`SQLITE_BUSY_SNAPSHOT` 等扩展码 `busy_timeout` 无效，按 `SQLiteException#getResultCode()` 名称含 `BUSY`/`LOCKED` 判定，再兼容标准错误码 5/6 与被 Spring 翻译后的 DataAccessException 文案；
+  4. **重试可观察**：每次命中累加 `sqliteBusy` 并打 `event=sqlite.busy` 告警，重试耗尽才向上抛——平时静默、异常时有痕迹，避免"重试掩盖真故障"。
+- **验证方式（命令 + 结果）**：
+  - `mvn -f server/pom.xml test` → 62 例全绿（新增 4 例单测 + 1 例 I-13 集成）；
+  - `SqliteBusyRetryInterceptorTest` 断言：命中两次后成功（delay 50/100，计数 2）、锁一直占用则 4 次尝试后放弃（delay 50/100/200）、非锁异常 1 次即抛且不计数；
+  - `SqliteBusyIntegrationTest`：20 线程 × 5 次终态 UPDATE 全部成功、无锁异常泄漏、P95 < 200ms。
+- **结论**：R-016 遗留的 `SQLITE_BUSY` 应用层退避已补齐，M5 门禁项全部达成。
+
+---
+
 ## 4. 关键决策点索引
 | # | 决策 | 结论 | 记录 | 主要影响文件 |
 | --- | --- | --- | --- | --- |
@@ -404,6 +423,7 @@
 | F-13 | 反复跑 `e2e/screenshot.mjs` 后，截图里出现同一议题的 3 张卡片 | 截图脚本每跑一次就新建一场圆桌，写进了本地库；交付截图看起来像"数据脏" | 截图前用「删库 + Flyway 重建」拿到纯种子数据（顺带验证初始化脚本可交付）；脚本里说明"lobby 截图在创建圆桌之前拍" | 重建后 `GET /api/discussions` 返回 6 条、议题唯一；截图无重复卡片 |
 | F-14 | SSE 只处理"读到错误"，对半开连接无感知；且重连 3 次后就 `onClose('error')` 永久放弃 | 地铁/切网时页面会永远停在旧内容，用户以为"没人说话"，其实是流早断了；恢复网络也不自愈 | ①客户端加 30s 空闲看门狗（服务端心跳 15s）：超时主动 abort 走重连；②重连不再设上限，退避封顶 4s，横幅常驻到恢复为止 | `E2E-5`：拦截 `/stream` → 横幅出现 → 放行后自动重连、快照补齐且无重复气泡 |
 | F-15 | 消息列表按 SSE 到达顺序 `push`，而用户消息的 `message.start` 可能晚于并行专家的 `message.start` | 页面出现"回答在提问之前"，可读性直接崩 | `upsertMessage` 改按 `createdAt` 落位，同毫秒返回 0（保持到达顺序）；不用 ULID 兜底 —— 同毫秒内随机段不单调，反而会排错 | `E2E-2` 断言"插话之后才有专家回复"，此前该用例正是靠这条断言发现的 |
+| F-16 | R-016 只靠 `busy_timeout + IMMEDIATE` 兜写锁，`ARCHITECTURE §3.7` 约定的应用层退避一直没实现 | 并发 agent 收尾撞 `SQLITE_BUSY_SNAPSHOT` 时 `busy_timeout` 无效，个别消息落库失败（接口偶发失败） | 加 `SqliteBusyRetryInterceptor` 拦 `Executor.update`，50/100/200ms 三次退避；识别扩展锁码；命中记日志与 `sqliteBusy` 指标 | `SqliteBusyRetryInterceptorTest` 断言退避序列与放弃策略；`SqliteBusyIntegrationTest` 20 线程并发写无泄漏、P95 < 200ms |
 
 ---
 
