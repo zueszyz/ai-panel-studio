@@ -9,6 +9,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -71,5 +72,18 @@ class ApiHealthIntegrationTest {
                 .andExpect(jsonPath("$.firstTokenMs.p50").isNumber())
                 .andExpect(jsonPath("$.agentFailureRate").isNumber())
                 .andExpect(jsonPath("$.sqliteBusy").isNumber());
+    }
+
+    @Test
+    @DisplayName("I-15 密钥边界：健康 / 指标 / 列表响应不含 sk- 与 apiKey 字面量")
+    void shouldNotLeakKeys() throws Exception {
+        for (String path : new String[] {"/api/health", "/api/metrics", "/api/discussions"}) {
+            String body = mockMvc.perform(get(path))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+            assertThat(body).as("响应不得泄漏模型密钥：%s", path)
+                    .doesNotContain("sk-")
+                    .doesNotContain("apiKey");
+        }
     }
 }
