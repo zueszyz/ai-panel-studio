@@ -33,7 +33,11 @@ import { copy } from '@/lib/copy'
       </nav>
     </header>
     <main id="main" class="app-main">
-      <RouterView />
+      <RouterView v-slot="{ Component, route }">
+        <Transition name="page-fade" mode="out-in">
+          <component :is="Component" :key="route.path" />
+        </Transition>
+      </RouterView>
     </main>
   </div>
 </template>

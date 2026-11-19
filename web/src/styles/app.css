@@ -25,14 +25,28 @@
 }
 
 .app-header {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-4);
   height: var(--header-height);
   padding: 0 var(--space-5);
-  background: var(--surface);
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
   border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(10px);
   flex: none;
+  z-index: 5;
+}
+
+.app-header::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--primary-line), transparent);
+  opacity: 0.5;
 }
 
 .brand {
@@ -40,7 +54,14 @@
   align-items: center;
   gap: var(--space-3);
   min-width: 0;
-  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-1);
+  margin-left: calc(var(--space-2) * -1);
+  border-radius: var(--radius-pill);
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.brand:hover {
+  background: var(--card);
 }
 
 .brand__mark {
@@ -49,7 +70,8 @@
   width: var(--space-6);
   height: var(--space-6);
   border-radius: var(--radius-pill);
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--primary-line);
+  background: var(--primary-soft);
   color: var(--primary);
   flex: none;
 }
@@ -88,7 +110,7 @@
   font-size: var(--text-sm);
   transition:
     color var(--dur-fast) var(--ease),
-    background var(--dur-fast) var(--ease);
+    background-color var(--dur-fast) var(--ease);
 }
 
 .nav-link:hover {
@@ -98,7 +120,8 @@
 
 .nav-link.router-link-active {
   color: var(--text);
-  background: var(--card);
+  background: var(--primary-soft);
+  box-shadow: inset 0 0 0 1px var(--primary-line);
 }
 
 .app-main {
@@ -107,16 +130,46 @@
   overflow: hidden;
 }
 
+/* 路由切换：只做 120ms 淡入，不做位移（讨论场景重内容） */
+.page-fade-enter-active {
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.page-fade-leave-active {
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.page-fade-enter-from,
+.page-fade-leave-to {
+  opacity: 0;
+}
+
 .page {
   height: 100%;
   overflow-y: auto;
   padding: var(--space-6) var(--space-5) var(--space-7);
+  animation: page-in var(--dur-base) var(--ease);
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-1));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .page__inner {
   width: 100%;
   max-width: var(--content-max);
   margin: 0 auto;
+}
+
+.page__inner--wide {
+  max-width: var(--content-wide);
 }
 
 .page-head {
@@ -136,6 +189,7 @@
   margin-top: var(--space-2);
   color: var(--text-secondary);
   font-size: var(--text-sm);
+  max-width: var(--copy-max);
 }
 
 @media (max-width: 767px) {

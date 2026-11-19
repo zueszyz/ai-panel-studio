@@ -14,7 +14,10 @@ body,
 
 body {
   margin: 0;
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image: var(--glow-primary), var(--glow-seat);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   color: var(--text);
   font-family: var(--font-sans);
   font-size: var(--text-md);
@@ -30,6 +33,7 @@ h4 {
   margin: 0;
   font-weight: 600;
   line-height: var(--leading-tight);
+  letter-spacing: -0.01em;
 }
 
 p {
@@ -102,19 +106,22 @@ select {
   padding: 0 var(--space-4);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
-  background: var(--card);
+  background-color: var(--card);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent);
   color: var(--text);
   font-size: var(--text-sm);
   white-space: nowrap;
+  box-shadow: var(--shadow-inset);
   transition:
-    background var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease),
     border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
     transform var(--dur-fast) var(--ease);
 }
 
 .btn:hover:not(:disabled) {
-  background: var(--card-hover);
-  border-color: var(--primary);
+  background-color: var(--card-hover);
+  border-color: var(--primary-line);
 }
 
 .btn:active:not(:disabled) {
@@ -127,14 +134,15 @@ select {
 }
 
 .btn--primary {
-  background: var(--primary);
+  background-color: var(--primary);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent);
   border-color: var(--primary);
-  color: #0b0e13;
+  color: var(--bg);
   font-weight: 600;
 }
 
 .btn--primary:hover:not(:disabled) {
-  background: var(--primary-strong);
+  background-color: var(--primary-strong);
   border-color: var(--primary-strong);
 }
 
@@ -165,11 +173,19 @@ select {
   font-size: var(--text-xs);
 }
 
+.btn--lg {
+  height: calc(var(--space-7) + var(--space-1));
+  padding: 0 var(--space-5);
+  font-size: var(--text-md);
+  border-radius: var(--radius-lg);
+}
+
 /* ── 卡片 ───────────────────────────────────────── */
 .card {
-  background: var(--card);
+  background-color: var(--card);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-1);
 }
 
@@ -177,32 +193,40 @@ select {
   cursor: pointer;
   transition:
     transform var(--dur-fast) var(--ease),
-    background var(--dur-fast) var(--ease),
-    border-color var(--dur-fast) var(--ease);
+    background-color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 .card--interactive:hover {
-  background: var(--card-hover);
+  background-color: var(--card-hover);
   border-color: var(--border-strong);
   transform: translateY(-1px);
+  box-shadow: var(--shadow-2);
 }
 
 /* ── 输入 ───────────────────────────────────────── */
 .field {
   width: 100%;
   padding: var(--space-3);
-  background: var(--surface);
+  background: var(--bg-elevated);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
   color: var(--text);
   line-height: var(--leading-normal);
   transition:
     border-color var(--dur-fast) var(--ease),
-    box-shadow var(--dur-fast) var(--ease);
+    box-shadow var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease);
 }
 
 .field::placeholder {
   color: var(--text-muted);
+}
+
+.field:hover:not(:focus) {
+  border-color: var(--border-strong);
+  background: var(--surface);
 }
 
 .field:focus {
@@ -227,6 +251,7 @@ select {
   border: 1px solid var(--border);
   color: var(--text-secondary);
   font-size: var(--text-xs);
+  letter-spacing: normal;
   white-space: nowrap;
 }
 
@@ -296,6 +321,70 @@ select {
 .mono {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
+}
+
+/* ── 语义化小部件 ───────────────────────────────── */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  letter-spacing: 0.18em;
+}
+
+.eyebrow::before {
+  content: '';
+  width: var(--space-4);
+  height: 1px;
+  background: var(--primary-line);
+}
+
+.badge--accent {
+  background: var(--primary-soft);
+  border-color: var(--primary-line);
+  color: var(--text);
+}
+
+.badge--muted {
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.badge--count {
+  min-width: var(--space-5);
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+/* 页面里的提示条：三处页面共用同一套语义 */
+.banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  font-size: var(--text-sm);
+}
+
+.banner--warning {
+  background: var(--warning-soft);
+  border-color: color-mix(in srgb, var(--warning) 34%, transparent);
+  color: var(--warning);
+}
+
+.banner--error {
+  background: var(--danger-soft);
+  border-color: color-mix(in srgb, var(--danger) 34%, transparent);
+  color: var(--danger);
+}
+
+.banner--info {
+  background: var(--primary-soft);
+  border-color: var(--primary-line);
+  color: var(--text-secondary);
 }
 
 .visually-hidden {

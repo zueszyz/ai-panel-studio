@@ -21,6 +21,8 @@ const filters: { key: LobbyFilter; label: string }[] = [
   { key: 'ended', label: copy.lobby.filters.ended },
 ]
 
+const facts = copy.lobby.facts
+
 const showSkeleton = computed(() => lobby.loading && lobby.items.length === 0)
 
 watch(searchInput, (value) => {
@@ -48,22 +50,32 @@ function onCreated(id: string): void {
 <template>
   <section class="page">
     <div class="page__inner page__inner--wide">
-      <header class="page-head">
-        <div>
-          <h1 class="page-title">{{ copy.lobby.title }}</h1>
-          <p class="page-subtitle">{{ copy.lobby.subtitle }}</p>
+      <header class="hero">
+        <div class="hero__copy">
+          <p class="eyebrow">{{ copy.lobby.eyebrow }}</p>
+          <h1 class="hero__title">{{ copy.lobby.heroTitle }}</h1>
+          <p class="hero__sub">{{ copy.lobby.heroBody }}</p>
+          <div class="hero__actions">
+            <button
+              type="button"
+              class="btn btn--primary btn--lg"
+              data-testid="create-discussion"
+              @click="dialogOpen = true"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+              </svg>
+              {{ copy.lobby.create }}
+            </button>
+            <span class="hero__hint">{{ copy.lobby.heroHint }}</span>
+          </div>
         </div>
-        <button
-          type="button"
-          class="btn btn--primary"
-          data-testid="create-discussion"
-          @click="dialogOpen = true"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
-          </svg>
-          {{ copy.lobby.create }}
-        </button>
+        <ul class="hero__facts">
+          <li v-for="fact in facts" :key="fact.label" class="fact">
+            <span class="fact__value">{{ fact.value }}</span>
+            <span class="fact__label">{{ fact.label }}</span>
+          </li>
+        </ul>
       </header>
 
       <div class="toolbar">
@@ -152,6 +164,88 @@ function onCreated(id: string): void {
 </template>
 
 <style scoped>
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.6fr);
+  gap: var(--space-6);
+  align-items: end;
+  padding: var(--space-6);
+  margin-bottom: var(--space-6);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(720px 280px at 0% 0%, var(--primary-soft), transparent 72%),
+    var(--surface);
+  animation: hero-in var(--dur-slow) var(--ease);
+}
+
+@keyframes hero-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-2));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.hero__title {
+  margin-top: var(--space-3);
+  font-size: var(--text-3xl);
+  line-height: 1.18;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.hero__sub {
+  margin-top: var(--space-3);
+  max-width: var(--copy-max);
+  color: var(--text-secondary);
+  line-height: var(--leading-relaxed);
+}
+
+.hero__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  flex-wrap: wrap;
+}
+
+.hero__hint {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.hero__facts {
+  display: grid;
+  gap: var(--space-2);
+  align-content: end;
+}
+
+.fact {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--card) 65%, transparent);
+}
+
+.fact__value {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.fact__label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
 .toolbar {
   display: flex;
   align-items: center;
@@ -170,23 +264,25 @@ function onCreated(id: string): void {
 }
 
 .tabs__item {
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-pill);
   color: var(--text-secondary);
   font-size: var(--text-sm);
   transition:
-    background var(--dur-fast) var(--ease),
-    color var(--dur-fast) var(--ease);
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 
 .tabs__item:hover {
   color: var(--text);
+  background: var(--card);
 }
 
 .tabs__item--active {
-  background: var(--card);
+  background: var(--primary-soft);
   color: var(--text);
-  box-shadow: var(--shadow-1);
+  box-shadow: inset 0 0 0 1px var(--primary-line);
 }
 
 .search {
@@ -213,8 +309,8 @@ function onCreated(id: string): void {
 .grid {
   display: grid;
   grid-template-columns: 1fr;
-  align-items: start;
-  gap: var(--space-3);
+  align-items: stretch;
+  gap: var(--space-4);
 }
 
 .skeleton-card {
@@ -270,6 +366,19 @@ function onCreated(id: string): void {
   max-width: var(--content-wide);
 }
 
+@media (max-width: 1023px) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: var(--space-5);
+    padding: var(--space-5);
+  }
+
+  .hero__facts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 @media (min-width: 1024px) {
   .grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -283,13 +392,22 @@ function onCreated(id: string): void {
 }
 
 @media (max-width: 767px) {
+  .hero {
+    padding: var(--space-4);
+    margin-bottom: var(--space-5);
+  }
+
+  .hero__title {
+    font-size: var(--text-2xl);
+  }
+
+  .hero__facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .search {
     margin-left: 0;
     width: 100%;
-  }
-
-  .page-head {
-    align-items: stretch;
   }
 }
 </style>

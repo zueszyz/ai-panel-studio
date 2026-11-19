@@ -55,7 +55,7 @@ const emit = defineEmits<{ action: [] }>()
 }
 
 .empty__body {
-  max-width: 42ch;
+  max-width: var(--copy-max);
   color: var(--text-secondary);
   font-size: var(--text-sm);
 }

@@ -11,7 +11,7 @@ const dotStyle = computed(() => ({ '--dot-color': statusDotColor(props.status) }
 </script>
 
 <template>
-  <span class="badge status-badge" :class="{ 'status-badge--live': status === 'LIVE' }">
+  <span class="badge status-badge" :class="`status-badge--${status.toLowerCase()}`">
     <span class="dot" :style="dotStyle" aria-hidden="true"></span>
     {{ label }}
   </span>
@@ -22,8 +22,29 @@ const dotStyle = computed(() => ({ '--dot-color': statusDotColor(props.status) }
   background: var(--dot-color);
 }
 
+.status-badge--live {
+  background: var(--success-soft);
+  border-color: color-mix(in srgb, var(--success) 32%, transparent);
+  color: var(--text);
+}
+
 .status-badge--live .dot {
   animation: pulse 1.6s var(--ease) infinite;
+}
+
+.status-badge--panel_ready {
+  background: var(--primary-soft);
+  border-color: var(--primary-line);
+  color: var(--text);
+}
+
+.status-badge--closed {
+  color: var(--text-muted);
+}
+
+.status-badge--summarizing {
+  background: var(--warning-soft);
+  border-color: color-mix(in srgb, var(--warning) 32%, transparent);
 }
 
 @keyframes pulse {

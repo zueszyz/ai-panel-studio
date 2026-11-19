@@ -5,6 +5,7 @@ import EmptyState from '@/components/EmptyState.vue'
 import SeatCard from '@/components/SeatCard.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import { copy } from '@/lib/copy'
+import { startDiscussion } from '@/lib/live'
 import { usePanelStore } from '@/stores/panel'
 
 const props = defineProps<{ id: string }>()
@@ -18,8 +19,14 @@ const failure = computed(() => panel.error !== null && panel.seats.length === 0)
 onMounted(() => void panel.init(props.id))
 onBeforeUnmount(() => panel.dispose())
 
-function enterDiscussion(): void {
-  void router.push(`/discussions/${props.id}`)
+async function enterDiscussion(): Promise<void> {
+  // 进入圆桌 = 主持人开场：先开场再跳转，现场页直接连流（已开场时后端返回 409，忽略即可）
+  try {
+    await startDiscussion(props.id)
+  } catch {
+    // 已经开场或状态不允许时，以现场页的实际状态为准
+  }
+  await router.push(`/discussions/${props.id}`)
 }
 </script>
 
@@ -33,11 +40,12 @@ function enterDiscussion(): void {
         {{ copy.common.back }}
       </RouterLink>
 
-      <header class="page-head">
+      <header class="page-head panel-head">
         <div class="headline">
+          <p class="eyebrow">{{ copy.panel.eyebrow }}</p>
           <div class="headline__meta">
             <StatusBadge :status="panel.status" />
-            <span class="badge">{{ copy.panel.title }}</span>
+            <span class="badge badge--muted">{{ copy.lobby.panelSizeHint }}</span>
           </div>
           <h1 class="topic" :title="panel.topic">{{ panel.topic || copy.common.loading }}</h1>
         </div>
@@ -64,21 +72,22 @@ function enterDiscussion(): void {
         </div>
       </header>
 
-      <p v-if="!panel.ready" class="hint muted">{{ copy.panel.regenLimitHint }}</p>
-
-      <section v-if="panel.analysis" class="analysis card">
-        <h2 class="analysis__title">{{ copy.panel.analysisTitle }}</h2>
-        <div v-if="panel.analysis.goal" class="analysis__group">
+      <section v-if="panel.analysis" class="analysis" data-testid="panel-analysis">
+        <div class="analysis__goal">
           <span class="analysis__label">{{ copy.panel.goalLabel }}</span>
-          <span class="analysis__goal">{{ panel.analysis.goal }}</span>
+          <p class="analysis__goal-text">{{ panel.analysis.goal || copy.panel.analysisPending }}</p>
         </div>
-        <div class="analysis__group">
+        <div class="analysis__row">
           <span class="analysis__label">{{ copy.panel.disputesLabel }}</span>
-          <span v-for="item in panel.analysis.disputes" :key="item" class="badge">{{ item }}</span>
+          <ul class="analysis__tags">
+            <li v-for="item in panel.analysis.disputes" :key="item" class="tag tag--dispute">{{ item }}</li>
+          </ul>
         </div>
-        <div class="analysis__group">
+        <div class="analysis__row">
           <span class="analysis__label">{{ copy.panel.anglesLabel }}</span>
-          <span v-for="item in panel.analysis.angles" :key="item" class="badge">{{ item }}</span>
+          <ul class="analysis__tags">
+            <li v-for="item in panel.analysis.angles" :key="item" class="tag">{{ item }}</li>
+          </ul>
         </div>
       </section>
 
@@ -161,13 +170,14 @@ function enterDiscussion(): void {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-bottom: var(--space-2);
+  margin: var(--space-3) 0 var(--space-2);
 }
 
 .topic {
-  font-size: var(--text-xl);
-  line-height: var(--leading-normal);
-  max-width: 46ch;
+  font-size: var(--text-2xl);
+  line-height: var(--leading-tight);
+  max-width: var(--reading-max);
+  text-wrap: balance;
 }
 
 .headline__actions {
@@ -176,47 +186,74 @@ function enterDiscussion(): void {
   gap: var(--space-2);
 }
 
-.hint {
-  margin-bottom: var(--space-4);
-  font-size: var(--text-xs);
-}
-
+/* 议题分析：像一张"议题卡"，目标是主句，争议与视角是两种标签 */
 .analysis {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-4);
+  gap: var(--space-3);
+  padding: var(--space-5);
   margin-bottom: var(--space-5);
-  background: var(--surface);
-}
-
-.analysis__title {
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-left: var(--border-accent) solid var(--primary);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(520px 180px at 0% 0%, var(--primary-soft), transparent 72%),
+    var(--surface);
 }
 
 .analysis__goal {
-  font-size: var(--text-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
 }
 
-.analysis__group {
+.analysis__goal-text {
+  font-size: var(--text-lg);
+  line-height: var(--leading-normal);
+  color: var(--text);
+}
+
+.analysis__row {
   display: flex;
-  align-items: center;
+  align-items: baseline;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.analysis__label {
+  flex: none;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  min-width: calc(var(--space-7) + var(--space-3));
+}
+
+.analysis__tags {
+  display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
 }
 
-.analysis__label {
-  color: var(--text-muted);
+.tag {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text-secondary);
   font-size: var(--text-xs);
-  min-width: var(--space-7);
+}
+
+.tag--dispute {
+  border-color: color-mix(in srgb, var(--seat-amber) 38%, transparent);
+  background: color-mix(in srgb, var(--seat-amber) 10%, transparent);
+  color: var(--seat-amber);
 }
 
 .grid {
   display: grid;
   grid-template-columns: 1fr;
-  align-items: start;
-  gap: var(--space-3);
+  align-items: stretch;
+  gap: var(--space-4);
 }
 
 .skeleton-seat {
@@ -303,6 +340,12 @@ function enterDiscussion(): void {
   }
 }
 
+@media (min-width: 1600px) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 767px) {
   .headline__actions {
     width: 100%;
@@ -310,7 +353,15 @@ function enterDiscussion(): void {
   }
 
   .topic {
-    font-size: var(--text-lg);
+    font-size: var(--text-xl);
+  }
+
+  .analysis {
+    padding: var(--space-4);
+  }
+
+  .analysis__label {
+    min-width: 0;
   }
 }
 </style>
