@@ -445,14 +445,14 @@
 | F-14 | SSE 只处理"读到错误"，对半开连接无感知；且重连 3 次后就 `onClose('error')` 永久放弃 | 地铁/切网时页面会永远停在旧内容，用户以为"没人说话"，其实是流早断了；恢复网络也不自愈 | ①客户端加 30s 空闲看门狗（服务端心跳 15s）：超时主动 abort 走重连；②重连不再设上限，退避封顶 4s，横幅常驻到恢复为止 | `E2E-5`：拦截 `/stream` → 横幅出现 → 放行后自动重连、快照补齐且无重复气泡 |
 | F-15 | 消息列表按 SSE 到达顺序 `push`，而用户消息的 `message.start` 可能晚于并行专家的 `message.start` | 页面出现"回答在提问之前"，可读性直接崩 | `upsertMessage` 改按 `createdAt` 落位，同毫秒返回 0（保持到达顺序）；不用 ULID 兜底 —— 同毫秒内随机段不单调，反而会排错 | `E2E-2` 断言"插话之后才有专家回复"，此前该用例正是靠这条断言发现的 |
 | F-16 | R-016 只靠 `busy_timeout + IMMEDIATE` 兜写锁，`ARCHITECTURE §3.7` 约定的应用层退避一直没实现 | 并发 agent 收尾撞 `SQLITE_BUSY_SNAPSHOT` 时 `busy_timeout` 无效，个别消息落库失败（接口偶发失败） | 加 `SqliteBusyRetryInterceptor` 拦 `Executor.update`，50/100/200ms 三次退避；识别扩展锁码；命中记日志与 `sqliteBusy` 指标 | `SqliteBusyRetryInterceptorTest` 断言退避序列与放弃策略；`SqliteBusyIntegrationTest` 20 线程并发写无泄漏、P95 < 200ms |
-| F-22 | `AgentRunner` 只 catch `LlmException`：终态落库失败时异常被上层 future 吞掉，消息卡在 STREAMING | 用户看到永远"正在生成"，与 FR-9「本条可能未保存」不符 | catch `DataAccessException`，发 `message.failed` + `DB_WRITE_FAILED`，卡片转 FAILED 并可单条重试 | `AgentRunnerTest#shouldReportDbWriteFailure` 断言失败码与事件数 |
-| F-24 | SSE 客户端断开时 IOException 落到全局 handler，试图把 ApiError 写进 text/event-stream 响应，引发 HttpMessageNotWritableException 连锁 ERROR | 日志被噪音淹没（功能不受影响） | IOException 归为客户端断开仅记 debug；响应已提交或为 SSE 时 handler 不再写错误体 | ApiExceptionHandlerTest 断言 SSE 无错误体、普通响应仍 500 |
-| F-23 | LLM_NOT_CONFIGURED 文案暗示整场可离线跑，实际预设只生成席位 | 按提示操作后发言全失败、纪要 MINUTES_EMPTY | 文案与 API 错误表明确「预设仅席位」，组局失败卡补提示 | web build 通过；文案与 API.md §4 一致 |
-| F-21 | 插话延后条件用了 `allMatch`：只有部分目标席位忙时其余仍被跳过 | E2E-2「同时点名两位」只出现一条流式，断言偶发红 | 改为 `anyMatch`：只要有一位目标席位忙就整轮延后，保证被点名的专家一起回应 | E2E-2 连续两次全绿 |
-| F-20 | E2E global teardown 用异步 `spawn('taskkill')` 后立刻退出 | java/vite/mock 残留，占住 8080/5173/9099 与 `e2e.db`，下一次 pretest 删库报 EPERM | 改用同步 `spawnSync`，确保进程退出后再返回 | 连续两次 E2E 结束后 `netstat` 三个端口均无监听 |
-| F-19 | 插话选中的席位都还在发言时整轮被跳过，用户消息没有任何回应 | 违反 FR-4「任意时刻可发言、下一轮优先回应」；E2E-4 因此拿不到失败卡片 | 插话回合先检查 inflight：目标都忙时延后 300ms 重排（最多 3 次），仍忙则回 `AGENT_BUSY` 提示；不推进回合号 | 修复后 `pnpm -C e2e test` 5 条全绿；插话必有回应 |
-| F-18 | E2E `waitForRunsSettled` 把空轨迹表判定为「已收尾」 | 上一轮发言还在 inflight 时就发插话，插话被跳过，E2E-4 误报失败 | 加 `minRuns=1`：轨迹表至少有一条记录且无 busy 才认为收尾 | E2E-4 稳定通过 |
 | F-17 | API §4 的 `ALREADY_STARTED` / `DISCUSSION_STATE_INVALID` / `MINUTES_NOT_FOUND` / `SEAT_NOT_CLAIMABLE` 在 `lib/copy.ts` 没有映射 | 用户看到「出了点问题」而不是具体原因 | 补齐四条中文文案 | 错误码集合与 API §4 逐项比对一致 |
+| F-18 | E2E `waitForRunsSettled` 把空轨迹表判定为「已收尾」 | 上一轮发言还在 inflight 时就发插话，插话被跳过，E2E-4 误报失败 | 加 `minRuns=1`：轨迹表至少有一条记录且无 busy 才认为收尾 | E2E-4 稳定通过 |
+| F-19 | 插话选中的席位都还在发言时整轮被跳过，用户消息没有任何回应 | 违反 FR-4「任意时刻可发言、下一轮优先回应」；E2E-4 因此拿不到失败卡片 | 插话回合先检查 inflight：目标都忙时延后 300ms 重排（最多 3 次），仍忙则回 `AGENT_BUSY` 提示；不推进回合号 | 修复后 `pnpm -C e2e test` 5 条全绿；插话必有回应 |
+| F-20 | E2E global teardown 用异步 `spawn('taskkill')` 后立刻退出 | java/vite/mock 残留，占住 8080/5173/9099 与 `e2e.db`，下一次 pretest 删库报 EPERM | 改用同步 `spawnSync`，确保进程退出后再返回 | 连续两次 E2E 结束后 `netstat` 三个端口均无监听 |
+| F-21 | 插话延后条件用了 `allMatch`：只有部分目标席位忙时其余仍被跳过 | E2E-2「同时点名两位」只出现一条流式，断言偶发红 | 改为 `anyMatch`：只要有一位目标席位忙就整轮延后，保证被点名的专家一起回应 | E2E-2 连续两次全绿 |
+| F-22 | `AgentRunner` 只 catch `LlmException`：终态落库失败时异常被上层 future 吞掉，消息卡在 STREAMING | 用户看到永远"正在生成"，与 FR-9「本条可能未保存」不符 | catch `DataAccessException`，发 `message.failed` + `DB_WRITE_FAILED`，卡片转 FAILED 并可单条重试 | `AgentRunnerTest#shouldReportDbWriteFailure` 断言失败码与事件数 |
+| F-23 | LLM_NOT_CONFIGURED 文案暗示整场可离线跑，实际预设只生成席位 | 按提示操作后发言全失败、纪要 MINUTES_EMPTY | 文案与 API 错误表明确「预设仅席位」，组局失败卡补提示 | web build 通过；文案与 API.md §4 一致 |
+| F-24 | SSE 客户端断开时 IOException 落到全局 handler，试图把 ApiError 写进 text/event-stream 响应，引发 HttpMessageNotWritableException 连锁 ERROR | 日志被噪音淹没（功能不受影响） | IOException 归为客户端断开仅记 debug；响应已提交或为 SSE 时 handler 不再写错误体 | ApiExceptionHandlerTest 断言 SSE 无错误体、普通响应仍 500 |
 
 ---
 
