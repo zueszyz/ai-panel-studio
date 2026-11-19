@@ -1,3 +1,10 @@
+c253d0a 2026-11-19 docs: sort audit findings by id in PROMPT_LOG
+779e476 2026-11-19 docs: sync 74-test counts and log preset/SSE fixes
+e90c03a 2026-11-19 fix(web): scope preset fallback wording in remaining error copy
+ca9b451 2026-11-19 fix(server): stop writing JSON errors on committed SSE responses
+a16276d 2026-11-19 docs(api): scope LLM_NOT_CONFIGURED to preset seats only
+922a7aa 2026-11-19 fix(web): clarify that preset panels only cover seat generation
+5e90164 2026-11-19 docs: refresh git history export after final audit
 e0f0137 2026-11-19 docs: correct remaining stale test counts
 f7903aa 2026-11-19 docs: sync 72-test counts, I-case references and history export
 188921c 2026-11-19 test(server): wait for the full panel.failed data frame
