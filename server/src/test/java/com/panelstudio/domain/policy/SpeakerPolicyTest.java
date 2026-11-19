@@ -63,6 +63,19 @@ class SpeakerPolicyTest {
     }
 
     @Test
+    @DisplayName("点名 + 关注点 + 引用可叠加，综合分最高者排首位")
+    void shouldStackSignals() {
+        List<SpeakerPolicy.Decision> picked = SpeakerPolicy.pick(List.of(
+                seat("st_1", "陈立", List.of("成本"), 2),
+                seat("st_2", "周敏", List.of("成本"), 2)), "陈立，成本到底谁来承担", "st_1", 3, 1);
+
+        assertThat(picked).hasSize(1);
+        assertThat(picked.get(0).seatId()).isEqualTo("st_1");
+        assertThat(picked.get(0).reason()).contains("被点名").contains("命中关注点");
+        assertThat(picked.get(0).score()).isGreaterThan(5);
+    }
+
+    @Test
     @DisplayName("K 上限生效，空候选返回空")
     void shouldRespectLimitAndEmpty() {
         List<SpeakerPolicy.Decision> picked = SpeakerPolicy.pick(List.of(
