@@ -54,8 +54,11 @@ class ContextBuilderTest {
         String user = messages.get(1).content();
 
         assertThat(user).contains("已折叠为 6 条");
+        assertThat(user).contains("周敏×6");
         assertThat(user).contains("第 6 条发言内容");
         assertThat(user).doesNotContain("第 5 条发言内容");
+        String summary = user.substring(user.indexOf("【更早的发言】"), user.indexOf("【最近发言】"));
+        assertThat(summary.length()).isLessThanOrEqualTo(400);
     }
 
     @Test

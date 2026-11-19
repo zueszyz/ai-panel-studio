@@ -7,6 +7,7 @@ import com.panelstudio.infra.llm.PromptTemplates;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -22,6 +23,8 @@ public class ContextBuilder {
     /** 原文保留条数：再多就折叠成摘要，避免 10 回合后上下文无限膨胀。 */
     public static final int KEEP_RECENT = 6;
     private static final int MAX_QUOTE_CHARS = 120;
+    /** 折叠摘要上限（ARCHITECTURE §3.5：≤400 字），不把旧原文逐字塞回上下文。 */
+    private static final int MAX_SUMMARY_CHARS = 400;
 
     public record ContextRequest(AgentEntity seat,
                                  String topic,
@@ -55,11 +58,7 @@ public class ContextBuilder {
         List<MessageEntity> history = request.history() == null ? List.of() : request.history();
         int from = Math.max(0, history.size() - KEEP_RECENT);
         if (from > 0) {
-            block.append("【更早的发言】已折叠为 ")
-                    .append(from)
-                    .append(" 条，讨论已进行到第 ")
-                    .append(request.history().get(history.size() - 1).getRoundNo())
-                    .append(" 回合，此前的分歧已被反复讨论。\n");
+            block.append(foldSummary(history, from, request.seatNames())).append('\n');
         }
         if (from < history.size()) {
             block.append("【最近发言】\n");
@@ -85,6 +84,32 @@ public class ContextBuilder {
         }
         block.append("请只输出你要说的这一段话，不要任何前缀或解释。");
         return block.toString();
+    }
+
+    /**
+     * 规则化滚动摘要：只保留「谁在哪些回合说了几次」，不把旧原文逐字带回上下文。
+     * 纯函数、不调模型；每 4 回合折叠一次的历史在这里被压成一行，长度封顶 400 字。
+     */
+    private static String foldSummary(List<MessageEntity> history, int from, Map<String, String> seatNames) {
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        int minRound = Integer.MAX_VALUE;
+        int maxRound = 0;
+        for (int index = 0; index < from; index++) {
+            MessageEntity message = history.get(index);
+            counts.merge(speakerLabel(message, seatNames), 1, Integer::sum);
+            int round = message.getRoundNo() == null ? 0 : message.getRoundNo();
+            minRound = Math.min(minRound, round);
+            maxRound = Math.max(maxRound, round);
+        }
+        StringBuilder summary = new StringBuilder("【更早的发言】已折叠为 ")
+                .append(from).append(" 条（第 ")
+                .append(minRound == Integer.MAX_VALUE ? 0 : minRound)
+                .append("–").append(maxRound).append(" 回合）：");
+        counts.forEach((name, count) -> summary.append(name).append('×').append(count).append(' '));
+        String text = summary.toString().trim();
+        return text.length() <= MAX_SUMMARY_CHARS
+                ? text
+                : text.substring(0, MAX_SUMMARY_CHARS) + "…";
     }
 
     private static String speakerLabel(MessageEntity message, Map<String, String> seatNames) {
