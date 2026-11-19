@@ -14,6 +14,7 @@ import com.panelstudio.api.dto.DiscussionDtos.SeatView;
 import com.panelstudio.application.session.SessionActorRegistry;
 import com.panelstudio.domain.entity.AgentEntity;
 import com.panelstudio.domain.entity.DiscussionEntity;
+import com.panelstudio.domain.enums.AgentStatus;
 import com.panelstudio.domain.entity.MessageEntity;
 import com.panelstudio.domain.entity.ParticipantEntity;
 import com.panelstudio.domain.enums.DiscussionStatus;
@@ -89,6 +90,46 @@ public class DiscussionService {
         discussionMapper.insert(entity);
         return new CreateDiscussionResponse(entity.getId(), entity.getTopic(), entity.getStatus(),
                 entity.getPanelSize(), entity.getTurnIndex(), entity.getCreatedAt());
+    }
+
+    /**
+     * 再来一场（FR-8）：同议题复制席位配置，但消息 / 认领 / 纪要 / 回合进度全部从头开始。
+     * 席位用新 id 且恢复 ACTIVE，避免把上一场的「我已认领」「已离席」带进新场。
+     */
+    @Transactional
+    public CreateDiscussionResponse restart(String sourceId, String deviceId) {
+        DiscussionEntity source = requireDiscussion(sourceId);
+        String userId = userService.resolveUserId(deviceId);
+
+        DiscussionEntity created = new DiscussionEntity();
+        created.setId(idGenerator.nextWithPrefix(IdPrefixes.DISCUSSION));
+        created.setTopic(source.getTopic());
+        created.setGoal(source.getGoal());
+        created.setTopicAnalysis(source.getTopicAnalysis());
+        created.setStatus(DiscussionStatus.DRAFT);
+        created.setPanelSize(source.getPanelSize() == null ? DEFAULT_PANEL_SIZE : source.getPanelSize());
+        created.setTurnIndex(0);
+        created.setCreatedBy(userId);
+        discussionMapper.insert(created);
+
+        for (AgentEntity seat : agentMapper.findByDiscussionId(sourceId)) {
+            AgentEntity copy = new AgentEntity();
+            copy.setId(idGenerator.nextWithPrefix(IdPrefixes.SEAT));
+            copy.setDiscussionId(created.getId());
+            copy.setRoleType(seat.getRoleType());
+            copy.setName(seat.getName());
+            copy.setTitle(seat.getTitle());
+            copy.setStance(seat.getStance());
+            copy.setFocus(seat.getFocus() == null ? List.of() : new ArrayList<>(seat.getFocus()));
+            copy.setVoice(seat.getVoice());
+            copy.setColorToken(seat.getColorToken());
+            copy.setSystemPromptDigest(seat.getSystemPromptDigest());
+            copy.setOrderIndex(seat.getOrderIndex());
+            copy.setStatus(AgentStatus.ACTIVE);
+            agentMapper.insert(copy);
+        }
+        return new CreateDiscussionResponse(created.getId(), created.getTopic(), created.getStatus(),
+                created.getPanelSize(), created.getTurnIndex(), created.getCreatedAt());
     }
 
     public DiscussionListResponse list(String statusParam, String keyword, boolean mine, String cursor,

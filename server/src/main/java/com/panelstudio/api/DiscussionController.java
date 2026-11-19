@@ -62,6 +62,15 @@ public class DiscussionController {
         return discussionService.detail(id, deviceId);
     }
 
+    @PostMapping("/{id}/restart")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "再来一场：复制议题与席位配置，新建一场圆桌")
+    public CreateDiscussionResponse restart(
+            @RequestHeader(value = "X-Device-Id", required = false) String deviceId,
+            @PathVariable("id") String id) {
+        return discussionService.restart(id, deviceId);
+    }
+
     @DeleteMapping("/{id}")
     @Operation(summary = "软删除圆桌（仅创建者）")
     public DeleteDiscussionResponse delete(

@@ -161,6 +161,47 @@ class DiscussionApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("FR-8 再来一场：复制议题与席位，新建场从 DRAFT 重新开始")
+    void shouldRestartDiscussionWithCopiedSeats() throws Exception {
+        MvcResult created = mockMvc.perform(post("/api/discussions")
+                        .header("X-Device-Id", DEVICE_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "topic", "我们该不该把推荐系统从规则引擎换成向量召回",
+                                "panelSize", 4))))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String sourceId = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asText();
+
+        mockMvc.perform(post("/api/discussions/" + sourceId + "/panel")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.TEXT_EVENT_STREAM, MediaType.APPLICATION_JSON)
+                        .content("{\"regenerate\":false,\"preset\":true}"))
+                .andExpect(status().isOk());
+
+        MvcResult restarted = mockMvc.perform(post("/api/discussions/" + sourceId + "/restart")
+                        .header("X-Device-Id", DEVICE_ID))
+                .andExpect(status().isCreated())
+                .andReturn();
+        JsonNode body = objectMapper.readTree(restarted.getResponse().getContentAsString());
+        String newId = body.path("id").asText();
+        assertThat(newId).isNotEqualTo(sourceId);
+        assertThat(body.path("status").asText()).isEqualTo("DRAFT");
+        assertThat(body.path("turnIndex").asInt()).isZero();
+        assertThat(body.path("topic").asText()).isEqualTo("我们该不该把推荐系统从规则引擎换成向量召回");
+
+        JsonNode sourceSeats = objectMapper.readTree(mockMvc.perform(get("/api/discussions/" + sourceId))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).path("seats");
+        JsonNode newSeats = objectMapper.readTree(mockMvc.perform(get("/api/discussions/" + newId))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).path("seats");
+        assertThat(newSeats.size()).isEqualTo(sourceSeats.size());
+        for (int i = 0; i < sourceSeats.size(); i++) {
+            assertThat(newSeats.get(i).path("name").asText()).isEqualTo(sourceSeats.get(i).path("name").asText());
+            assertThat(newSeats.get(i).path("id").asText()).isNotEqualTo(sourceSeats.get(i).path("id").asText());
+        }
+    }
+
+    @Test
     @DisplayName("软删除：仅创建者可删；列表移除、直链 410、重复删除 410")
     void shouldSoftDeleteOnlyAsCreator() throws Exception {
         MvcResult created = mockMvc.perform(post("/api/discussions")
