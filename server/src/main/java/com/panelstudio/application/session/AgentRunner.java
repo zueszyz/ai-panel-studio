@@ -1,7 +1,9 @@
 package com.panelstudio.application.session;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.panelstudio.api.dto.StreamEvents.AgentStatus;import com.panelstudio.api.dto.StreamEvents.MessageDelta;
+import com.panelstudio.api.dto.StreamEvents.AgentStatus;
+import com.panelstudio.api.dto.StreamEvents.ErrorFrame;
+import com.panelstudio.api.dto.StreamEvents.MessageDelta;
 import com.panelstudio.api.dto.StreamEvents.MessageEnd;
 import com.panelstudio.api.dto.StreamEvents.MessageFailed;
 import com.panelstudio.api.dto.StreamEvents.MessageStart;
@@ -215,6 +217,10 @@ public class AgentRunner {
             publisher.publish(discussionId, "agent.status", new AgentStatus(seat.getId(), "failed"));
             recordRun(request, messageId, AgentRunPhase.FAILED, ex.code(), latency, 0, startedIso,
                     request.quoteMessageId());
+            // FR-9：429 / 402 不是单卡故障，而是整场需要知道的原因——补一帧 error 让顶部横幅可见。
+            if ("LLM_RATE_LIMIT".equals(ex.code()) || "BUDGET_EXHAUSTED".equals(ex.code())) {
+                publisher.publish(discussionId, "error", new ErrorFrame(ex.code(), ex.getMessage(), true));
+            }
             log.warn("agent.fail discussionId={} seatId={} code={} partialChars={}",
                     discussionId, seat.getId(), ex.code(), partial.length());
             return message;

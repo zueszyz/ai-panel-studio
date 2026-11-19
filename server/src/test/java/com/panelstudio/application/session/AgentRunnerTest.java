@@ -123,6 +123,19 @@ class AgentRunnerTest {
     }
 
     @Test
+    @DisplayName("模型限流：除失败卡片外再发 error 帧，让顶部横幅可见（FR-9）")
+    void shouldSurfaceRateLimitBanner() {
+        llm.rateLimitFor("周敏");
+
+        MessageEntity message = runner.run(request(seat("st_2", "周敏", AgentRoleType.ANALYST)),
+                new CancelToken());
+
+        assertThat(message.getStatus()).isEqualTo(MessageStatus.FAILED);
+        assertThat(publisher.failedCodes()).containsExactly("LLM_RATE_LIMIT");
+        assertThat(publisher.countOf("error")).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("终态落库失败：发 DB_WRITE_FAILED 失败帧，不让卡片停在 STREAMING")
     void shouldReportDbWriteFailure() {
         when(messageMapper.updateById(any(MessageEntity.class)))
@@ -160,6 +173,11 @@ class AgentRunnerTest {
         private final Map<String, Long> finishedAt = new LinkedHashMap<>();
         private final Map<String, Integer> chunkCounts = new LinkedHashMap<>();
         private final List<String> failing = new ArrayList<>();
+        private final List<String> rateLimited = new ArrayList<>();
+
+        void rateLimitFor(String name) {
+            rateLimited.add(name);
+        }
 
         void delayFor(String name, long millis) {
             delays.put(name, millis);
@@ -193,6 +211,9 @@ class AgentRunnerTest {
             if (failing.contains(name)) {
                 listener.onDelta("半句话");
                 throw LlmException.timeout();
+            }
+            if (rateLimited.contains(name)) {
+                throw LlmException.rateLimited();
             }
             try {
                 Thread.sleep(delay / 4);
