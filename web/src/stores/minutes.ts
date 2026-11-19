@@ -23,12 +23,16 @@ export const useMinutesStore = defineStore('minutes', () => {
   const offline = ref(false)
   const copied = ref(false)
   const notFound = ref(false)
+  /** 当前展示的是「阶段性小结」（讨论中、不入库），还是正式纪要。 */
+  const interim = ref(false)
 
   let controller: AbortController | null = null
 
   const canGenerate = computed(
-    () => status.value === 'SUMMARIZING' || status.value === 'CLOSED' || status.value === 'INTERRUPTED',
+    () => status.value === 'LIVE' || status.value === 'SUMMARIZING'
+      || status.value === 'CLOSED' || status.value === 'INTERRUPTED',
   )
+  const isLive = computed(() => status.value === 'LIVE')
   const hasSections = computed(() => Object.keys(sections.value).length > 0)
   const versions = computed(() => view.value?.versions ?? [])
 
@@ -37,6 +41,7 @@ export const useMinutesStore = defineStore('minutes', () => {
     loading.value = true
     error.value = null
     notFound.value = false
+    interim.value = false
     try {
       const detail = await fetchDiscussion(id)
       topic.value = detail.topic
@@ -70,6 +75,7 @@ export const useMinutesStore = defineStore('minutes', () => {
   }
 
   async function selectVersion(version: number): Promise<void> {
+    interim.value = false
     await loadMinutes(version)
   }
 
@@ -81,6 +87,7 @@ export const useMinutesStore = defineStore('minutes', () => {
     error.value = null
     offline.value = false
     sections.value = {}
+    interim.value = status.value === 'LIVE'
     controller?.abort()
     controller = new AbortController()
     try {
@@ -89,9 +96,15 @@ export const useMinutesStore = defineStore('minutes', () => {
         {
           onSection: (payload) => {
             sections.value = { ...sections.value, [payload.key]: payload.md }
+            if (payload.interim !== undefined) {
+              interim.value = payload.interim
+            }
           },
           onDone: (payload) => {
             offline.value = payload.fallback === 'LOCAL'
+            if (payload.interim !== undefined) {
+              interim.value = payload.interim
+            }
           },
           onFailed: (payload) => {
             error.value = payload.keptVersion
@@ -100,8 +113,12 @@ export const useMinutesStore = defineStore('minutes', () => {
           },
         },
         controller.signal,
+        status.value === 'LIVE',
       )
-      await loadMinutes()
+      // 阶段性小结没有落库版本，不重新拉取；正式纪要才以数据库为准刷新。
+      if (!interim.value) {
+        await loadMinutes()
+      }
     } catch (err) {
       error.value = err instanceof ApiError ? errorMessage(err.code, err.message) : copy.errors.network
     } finally {
@@ -143,6 +160,8 @@ export const useMinutesStore = defineStore('minutes', () => {
     offline,
     copied,
     notFound,
+    interim,
+    isLive,
     canGenerate,
     hasSections,
     versions,

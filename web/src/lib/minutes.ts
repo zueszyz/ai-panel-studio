@@ -17,9 +17,10 @@ export async function generateMinutes(
   discussionId: string,
   handlers: MinuteStreamHandlers,
   signal?: AbortSignal,
+  interim = false,
 ): Promise<void> {
   await streamPost(
-    `/discussions/${discussionId}/minutes`,
+    `/discussions/${discussionId}/minutes${interim ? '?interim=true' : ''}`,
     {},
     (frame) => {
       let payload: unknown

@@ -265,6 +265,7 @@ export interface MinuteSectionEvent {
   key: MinuteSectionKey
   index: number
   md: string
+  interim?: boolean
 }
 
 export interface MinuteDoneEvent {
@@ -272,6 +273,7 @@ export interface MinuteDoneEvent {
   version: number
   tokensUsed: number
   fallback?: 'LOCAL' | null
+  interim?: boolean
 }
 
 export interface MinuteFailedEvent {

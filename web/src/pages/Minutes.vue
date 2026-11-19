@@ -72,6 +72,9 @@ function onEmptyAction(): void {
           <div class="headline__meta">
             <StatusBadge :status="store.status" />
             <span class="badge badge--muted">{{ copy.minutes.title }}</span>
+            <span v-if="store.interim" class="badge badge--accent" data-testid="interim-badge">
+              {{ copy.minutes.interimBadge }}
+            </span>
             <span v-if="store.offline" class="badge badge--muted">{{ copy.minutes.offline }}</span>
           </div>
           <h1 class="topic" :title="store.topic">{{ store.topic || copy.common.loading }}</h1>
@@ -109,11 +112,16 @@ function onEmptyAction(): void {
             data-testid="generate-minutes"
             @click="store.generate()"
           >
-            {{ store.generating ? copy.minutes.generating : store.view ? copy.minutes.regenerate : copy.minutes.generate }}
+            {{ store.generating ? copy.minutes.generating
+              : store.isLive ? copy.minutes.generateInterim
+                : store.view ? copy.minutes.regenerate : copy.minutes.generate }}
           </button>
         </div>
       </header>
 
+      <p v-if="store.interim && store.hasSections" class="banner banner--info" data-testid="interim-hint">
+        {{ copy.minutes.interimHint }}
+      </p>
       <p v-if="store.offline" class="banner banner--info" data-testid="offline-hint">
         {{ copy.minutes.offlineHint }}
       </p>
@@ -135,7 +143,9 @@ function onEmptyAction(): void {
         variant="empty"
         :title="store.notFound ? copy.minutes.empty : copy.minutes.errorTitle"
         :body="store.canGenerate ? copy.minutes.emptyBody : copy.minutes.needEndFirst"
-        :action-label="store.canGenerate ? copy.minutes.generate : copy.minutes.backToLive"
+        :action-label="store.canGenerate
+          ? (store.isLive ? copy.minutes.generateInterim : copy.minutes.generate)
+          : copy.minutes.backToLive"
         @action="onEmptyAction"
       />
 
