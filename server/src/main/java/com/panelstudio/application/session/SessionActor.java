@@ -64,6 +64,8 @@ public final class SessionActor {
     private final Map<String, Integer> lastSpokeRound = new ConcurrentHashMap<>();
     private final Set<String> spokenThisRound = ConcurrentHashMap.newKeySet();
     private final Map<String, CancelToken> inflight = new ConcurrentHashMap<>();
+    /** 插话重试次数（按 user messageId）：席位都忙时延后再答复，避免插话被静默丢弃。 */
+    private final Map<String, Integer> interruptRetries = new ConcurrentHashMap<>();
     private final List<MessageEntity> history = Collections.synchronizedList(new ArrayList<>());
     private final Deque<Runnable> queue = new ConcurrentLinkedDeque<>();
     private final AtomicBoolean draining = new AtomicBoolean(false);
@@ -181,6 +183,21 @@ public final class SessionActor {
                     new ErrorFrame("BUDGET_EXHAUSTED", "本场 token 预算已用完，请结束讨论并生成纪要", false));
             return;
         }
+        // 插话不能丢（FR-4）：目标席位都还在发言时，等它们结束再答复，而不是跳过本回合。
+        if (user != null && !speakers.isEmpty()
+                && speakers.stream().allMatch(inflight::containsKey)) {
+            int attempt = interruptRetries.merge(user.getId(), 1, Integer::sum);
+            if (attempt <= 3) {
+                CompletableFuture.delayedExecutor(300L, TimeUnit.MILLISECONDS)
+                        .execute(() -> enqueue(() -> runTurn(speakers, reason, user, quotedSeatId)));
+                log.debug("插话 {} 的目标席位都在发言，第 {} 次延后响应", user.getId(), attempt);
+            } else {
+                publisher.publish(discussionId, "error", new ErrorFrame("AGENT_BUSY",
+                        "嘉宾都还在发言，这条插话暂未得到回应，请稍后再发一次", true));
+            }
+            return;
+        }
+        interruptRetries.remove(user == null ? "" : user.getId());
         int round = turnIndex.incrementAndGet();
         spokenThisRound.clear();
         spokenThisRound.addAll(speakers);
