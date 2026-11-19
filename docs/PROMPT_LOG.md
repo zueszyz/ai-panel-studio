@@ -417,6 +417,26 @@
 
 ---
 
+### R-023 · 五席位选座、筹备中修复与纪要增强（2026-11-19 23:00–23:40）
+
+- **阶段**：M2/M3/M4 交互完善，按用户要求把"组局"改成先选座再生席。
+- **目标**：固定 1 主持 + 4 专家；用户自选一个专家席位，点一次即生成其余 AI 席位并自动开场；其他用户可在开场前加入；未等待时剩余席位保持 AI；同时增强纪要的参会信息与导出。
+- **Prompt（摘要）**：> 对生成纪要功能或模块进行更新完善；席位为 5 位，其中 1 主持与 4 专家，其中一个专家席位为用户自主选择；用户选座完毕后点击生成其他席位为 AI 后自动开始；修复筹备中的讨论；其他用户也可参加未开始的圆桌，未等待时其余席位自动 AI。
+- **实现**：
+  1. 新增 `UserSeatPlan`（固定专家顺序、用户席位档案）；`CreatePanelRequest` 增加 `userRole` / `autoStart`；`PanelService` 保留用户所选席位并在落库同一事务写入参与者；生成完调用 `DiscussionSessionService.start` 自动开场；
+  2. 组局页改为"选座面板"：主持人固定由 AI 担任，4 个专家角色单选；未选座不再自动生成；
+  3. 认领限制在筹备阶段：`LIVE` 后返回 `409 ALREADY_STARTED`；`SessionActor` 不再为 `REPLACED_BY_USER` 席位生成发言；
+  4. 大厅新增「筹备中」筛选与「可加入」标记，`PANEL_READY` 卡片回到组局页，方便其他用户认领；
+  5. 纪要 `structured.meta` 补参会席位、回合数、消息数、时长、用户关切；前端展示参会信息并支持下载 Markdown；结束讨论后跳转 `?auto=1` 自动生成；
+  6. 修复 `MinutesApiIntegrationTest` 新增用例的测试卫生：等用户插话的回应落库再结束，避免残留模型调用拖慢后续用例。
+- **验证方式（命令 + 结果）**：
+  - `mvn -f server/pom.xml test` → 全绿（新增选座/自动开场、AI 跳过人类席位、纪要 meta 断言）；
+  - `pnpm -C web build` → 通过；
+  - `pnpm -C e2e test` → E2E-1 改为选座流程后全绿。
+- **结论**：五席位与多人加入流程闭环；纪要从"只有六段"补齐为带参会事实与可导出的交付物。
+
+---
+
 ## 4. 关键决策点索引
 | # | 决策 | 结论 | 记录 | 主要影响文件 |
 | --- | --- | --- | --- | --- |
@@ -473,6 +493,9 @@
 | F-24 | SSE 客户端断开时 IOException 落到全局 handler，试图把 ApiError 写进 text/event-stream 响应，引发 HttpMessageNotWritableException 连锁 ERROR | 日志被噪音淹没（功能不受影响） | IOException 归为客户端断开仅记 debug；响应已提交或为 SSE 时 handler 不再写错误体 | ApiExceptionHandlerTest 断言 SSE 无错误体、普通响应仍 500 |
 | F-25 | 插话延后只重试 3 次 × 300ms，慢席位（假模型 1.8s / 真实首 token 45s）没结束就放弃 | 用户插话被丢弃，现场没有任何回应 | 改为按 messageId 记录 30s 截止时间，期间每 300ms 重排一次 | SessionActorTest + E2E-2 全绿 |
 | F-26 | E2E-2 用 /runs 判断「已收尾」，但轨迹表只在发言结束时写，看不到仍在 inflight 的发言 | 插话时上一轮还占着席位，并行断言偶发红 | 先断言页面没有 STREAMING 气泡，再发插话 | E2E-2 连续两次全绿 |
+| F-27 | 大厅 `ongoing` 混入 `PANEL_READY`，卡片直接进现场，其他用户找不到加入入口 | 筹备中的圆桌无法被其他用户认领 | 新增「筹备中」筛选；`DRAFT/PANEL_READY` 卡片进组局页并显示「可加入」 | 大厅筛选与 `openSeatCount` 接口字段 |
+| F-28 | `SessionActor` 只按角色过滤，用户接手的席位仍由 AI 发言 | 用户认领后现场出现"本人席位被 AI 代说" | 选发言人时排除 `REPLACED_BY_USER`；开场后禁止再换座 | `SessionActorTest#shouldSkipSeatClaimedByUser`；开场后认领返回 `ALREADY_STARTED` |
+| F-29 | 组局页在空席位时自动生成，用户没有机会先选自己的席位 | 无法实现"1 主持 + 4 专家里自选一席"的产品要求 | 空面板改为选座面板；用户点「生成其他席位并开始」后由服务端保留所选角色并自动开场 | E2E-1 选座流程全绿；`PanelApiIntegrationTest#shouldReserveUserSeatAndAutoStart` |
 
 ---
 

@@ -72,7 +72,7 @@ stubFor(post(urlEqualTo("/v1/chat/completions"))
 | 项 | 内容 |
 | --- | --- |
 | 前置 | 空库或种子库；WireMock 已就绪 |
-| 步骤 | 1. 打开 `/` → 点「发起圆桌」<br>2. 输入议题「我们该不该把推荐系统从规则引擎换成向量召回」<br>3. 选 4 人 → 提交<br>4. 断言进入 `/discussions/:id`，处于"生成中"<br>5. 等待 4 张席位卡逐个浮现<br>6. 点第 3 张「我来坐这里」<br>7. 点「进入圆桌」 |
+| 步骤 | 1. 打开 `/` → 点「发起圆桌」<br>2. 输入议题「我们该不该把推荐系统从规则引擎换成向量召回」<br>3. 选 5 人 → 提交<br>4. 组局页选「行业分析师」席位<br>5. 点「生成其他席位并开始」<br>6. 等待 5 张席位卡逐个浮现，自选席位显示「你」<br>7. 自动进入 `/discussions/:id`，主持人开场 |
 | 断言 | 议题在详情页可见；席位 4 个且含 1 位主持人；席位卡含姓名/岗位/立场；认领后头像变「你」并标「已认领」；开场后出现主持人 `OPENING` 消息且流式结束后 `status=done`；控制台无 error |
 | 反例 | 议题仅 5 字时提交按钮禁用并显示字数提示 |
 
@@ -107,13 +107,13 @@ WireMock 令 `st_3` 超时（`withFixedDelay(60000)`）。断言：该卡片「�
 | # | 用例 | 断言要点 |
 | --- | --- | --- |
 | I-1 | `POST /discussions` 参数校验 | 7 字议题 → 400 且 `details[0].field === 'topic'` |
-| I-2 | `POST /discussions/:id/panel` 帧序列 | 首帧 `panel.analysis`，随后 N 个 `seat.added`，末帧 `panel.done`；顺序稳定 |
+| I-2 | `POST /discussions/:id/panel` 帧序列 | 首帧 `panel.analysis`，随后 N 个 `seat.added`，末帧 `panel.done`；顺序稳定；五席位选座保留用户席位并自动开场（`shouldReserveUserSeatAndAutoStart`） |
 | I-3 | panel 重复调用 | 已有 `PANEL_READY` 时席位 id 不变（不重建） |
-| I-4 | `claim` 冲突 | 第二人认领同席位 → 409 `SEAT_TAKEN`（验证部分唯一索引） |
+| I-4 | `claim` 冲突 | 第二人认领同席位 → 409 `SEAT_TAKEN`；开场后认领 → 409 `ALREADY_STARTED`（验证部分唯一索引与筹备阶段约束） |
 | I-5 | `messages` 幂等 | 同 `clientMsgId` 两次 → 一条消息、只触发一轮调度 |
 | I-6 | 非 LIVE 发言 | `DRAFT` → 409 `DISCUSSION_NOT_LIVE` |
 | I-7 | `end` 后发言 | 410 `DISCUSSION_CLOSED` |
-| I-8 | minutes 版本 | 连生两次 → `version` 1、2；`?version=1` 可取旧版（`MinutesApiIntegrationTest#shouldVersionMinutes`） |
+| I-8 | minutes 版本 | 连生两次 → `version` 1、2；`?version=1` 可取旧版；参会席位/回合/用户关切写入 `structured.meta`（`shouldVersionMinutes` / `shouldIncludeParticipantFactsAndUserQuestions`） |
 | I-9 | minutes 失败不覆盖 | 模型连续返回非 JSON → 旧版仍 `READY`，流里含 `keptVersion`（`#shouldKeepPreviousVersionOnFailure`） |
 | I-10 | 预算耗尽 | 打满 `budget` → 402 `BUDGET_EXHAUSTED`，已有消息可读（阈值由 `TokenBudgetTest` 覆盖，402 出口在 `DiscussionSessionService#postMessage`） |
 | I-11 | SSE 续传 | 带 `Last-Event-ID` 重连 → 不丢不重（`SseReplayIntegrationTest#shouldReplayOnlyFramesAfterCursor`） |
@@ -152,7 +152,7 @@ WireMock 令 `st_3` 超时（`withFixedDelay(60000)`）。断言：该卡片「�
 ## 6. 执行方式
 
 ```bash
-# 后端：单元 + 集成（Flyway 建临时库，WireMock 内嵌，80 例）
+# 后端：单元 + 集成（Flyway 建临时库，WireMock 内嵌，84 例）
 mvn -f server/pom.xml test
 
 # 前端：vue-tsc 类型检查 + 构建（Vitest 未接入，前端行为由 E2E 覆盖）
@@ -174,7 +174,7 @@ pnpm -C e2e test
 
 ## 7. 交付前自检（打包前必跑）
 
-- [ ] `mvn -f server/pom.xml test` 全绿（单元 + 集成 80 条，含 SQLite 并发写）
+- [ ] `mvn -f server/pom.xml test` 全绿（单元 + 集成 84 条，含 SQLite 并发写）
 - [ ] `pnpm -C e2e test` 全绿（5 条，约 35s）
 - [ ] 删除 `data/panel-studio.db` 后重启，Flyway 三个脚本自动建库并 seed 成功（证明"数据库初始化脚本"可交付）
 - [ ] `/swagger-ui.html` 可访问，接口数量与 [API](API.md) §1 一致（19 个）

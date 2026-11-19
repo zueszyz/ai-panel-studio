@@ -50,7 +50,7 @@ POST /api/discussions
 X-Device-Id: 7c1f...a9
 Content-Type: application/json
 
-{ "topic": "我们该不该把推荐系统从规则引擎换成向量召回", "panelSize": 4 }
+{ "topic": "我们该不该把推荐系统从规则引擎换成向量召回", "panelSize": 5 }
 ```
 
 ```json
@@ -59,13 +59,13 @@ Content-Type: application/json
   "id": "dk_2f8a1c",
   "topic": "我们该不该把推荐系统从规则引擎换成向量召回",
   "status": "DRAFT",
-  "panelSize": 4,
+  "panelSize": 5,
   "turnIndex": 0,
   "createdAt": "2026-11-17T08:12:31.000Z"
 }
 ```
 
-校验：`topic` 长度 8–200；`panelSize` 3–6（默认 4）。失败返回 `400 VALIDATION_ERROR` 并带字段级 `details`。
+校验：`topic` 长度 8–200；`panelSize` 3–6（默认 5：1 位主持人 + 4 位专家）。失败返回 `400 VALIDATION_ERROR` 并带字段级 `details`。
 
 ### 2.2 `GET /discussions` 列表
 
@@ -79,14 +79,15 @@ GET /api/discussions?status=LIVE&q=推荐&mine=true&cursor=dk_2f8a1c&limit=20
     "id": "dk_2f8a1c",
     "topic": "我们该不该把推荐系统从规则引擎换成向量召回",
     "createdByMe": true,
-    "status": "LIVE",
-    "panelSize": 4,
-    "turnIndex": 3,
+    "status": "PANEL_READY",
+    "panelSize": 5,
+    "turnIndex": 0,
     "seats": [
       { "id": "st_1", "name": "沈知远", "title": "主持人", "colorToken": "slate", "status": "ACTIVE" },
       { "id": "st_2", "name": "陈立", "title": "战略顾问", "colorToken": "amber", "status": "REPLACED_BY_USER", "claimedByMe": true }
     ],
-    "lastMessage": { "preview": "……所以关键不是模型，而是样本量", "speaker": "陈立", "at": "2026-11-17T08:31:02.000Z" },
+    "openSeatCount": 3,
+    "lastMessage": null,
     "updatedAt": "2026-11-17T08:31:02.000Z"
   }],
   "nextCursor": null
@@ -95,7 +96,8 @@ GET /api/discussions?status=LIVE&q=推荐&mine=true&cursor=dk_2f8a1c&limit=20
 
 - 排序：`LIVE` 优先，再按 `updatedAt` 倒序。
 - `q` 走 `LIKE '%'||?||'%'` 模糊匹配议题（SQLite 无 `pg_trgm`；数据量小，全表扫足够；后续可换 FTS5 trigram）；`mine=true` 过滤"我参与的"（需要 `X-Device-Id`，缺失时返回空列表）。
-- `status` 支持逗号分隔的集合，便于「进行中」这类分组查询：`status=LIVE,PANEL_READY,SUMMARIZING,INTERRUPTED`；非法取值返回 `400 VALIDATION_ERROR`。
+- `status` 支持逗号分隔的集合，便于「筹备中」「进行中」这类分组查询：`status=DRAFT,PANEL_READY`（筹备中，可加入）、`status=LIVE,SUMMARIZING,INTERRUPTED`（进行中）；非法取值返回 `400 VALIDATION_ERROR`。
+- `openSeatCount`：仍可被其他参与者接手的专家席位数；开场前大于 0 时前端显示「可加入」。
 - `cursor` 是**不透明字符串**（内部为偏移量）。排序包含状态优先级，无法用 ULID 做纯 id 游标，因此客户端只回传上一页的 `nextCursor`，不解析内容。
 - `createdByMe` 由服务端根据 `X-Device-Id` 解析出的 `userId` 计算：前端据此只向创建者展示「删除」入口，不暴露内部 `userId`。
 
@@ -133,8 +135,12 @@ POST /api/discussions/dk_2f8a1c/panel
 Accept: text/event-stream, application/json
 Content-Type: application/json
 
-{ "regenerate": false, "preset": false }
+{ "regenerate": false, "preset": false, "userRole": "TECH", "autoStart": true }
 ```
+
+- `userRole`：用户自选的专家角色（`STRATEGIST` / `ANALYST` / `TECH` / `FINANCE` / `RESEARCHER`）。服务端按固定席位方案保留该角色给本人，其余席位由 AI 生成；用户席位直接以 `REPLACED_BY_USER` 落库并写入参与者记录。
+- `autoStart:true`：其余席位生成完后立即调用开场；`panel.done` 的 `status` 为 `LIVE`。
+- 不传 `userRole` 时全部席位由 AI 担任（「全部交给 AI」）。
 
 事件序列（逐个席位到达，前端逐张渲染）：
 
@@ -151,13 +157,14 @@ data: {"id":"st_2","roleType":"STRATEGIST","name":"陈立","title":"战略顾问
 …
 
 event: panel.done
-data: {"discussionId":"dk_2f8a1c","status":"PANEL_READY","seats":4}
+data: {"discussionId":"dk_2f8a1c","status":"PANEL_READY","seats":5}
 ```
 
 - `regenerate:true` 时最多 2 次（第 3 次返回 `429 REGEN_LIMIT`），且只替换未被认领的席位。
 - `preset:true` 跳过模型，直接用内置的 3 套预设阵容（离线可用）；`panel.done` 会带 `"fallback":"PRESET"` 表示本次为降级结果。
 - 生成失败：`event: panel.failed` + `data: {"code":"LLM_JSON_INVALID","retriable":true,"fallbackAvailable":true}`；`fallbackAvailable` 为真时前端展示「使用预设阵容」。
-- 幂等：同一讨论已有 `PANEL_READY` 且未要求重生成时，直接推送现有席位后 `panel.done`（席位 id 不变）。
+- 幂等：同一讨论已有 `PANEL_READY` 且未要求重生成时，直接推送现有席位后 `panel.done`（席位 id 不变）；带 `autoStart:true` 时继续直接开场。
+- 用户席位在 `seat.added` 中 `claimedByMe=true`、`status=REPLACED_BY_USER`；其余席位 `claimedByMe=false`、`status=ACTIVE`。
 - 错误路径（`429 REGEN_LIMIT`、`409`）发生在建立流式响应之前，按统一错误体返回 JSON，因此客户端 `Accept` 需同时包含 `application/json`。
 - 落库时机：席位在生成结束后一次性写入（单事务），中途失败不产生半截席位；`preset` 与模型失败都不会写入脏数据。
 
@@ -174,6 +181,8 @@ POST /api/discussions/dk_2f8a1c/claim
 
 - 撤销：`POST /claim { "seatId": null }` → 恢复 AI 席位（`status=ACTIVE`），历史发言保留。
 - 旁人已认领：`409 SEAT_TAKEN`；席位不存在：`404 SEAT_NOT_FOUND`；讨论已结束：`409 DISCUSSION_CLOSED`。
+- **只在筹备阶段可认领**：讨论已开场（`LIVE`）时返回 `409 ALREADY_STARTED`；开始后未被认领的席位继续由 AI 担任。
+- 其他参与者可以在 `DRAFT` / `PANEL_READY` 阶段认领专家席位；发起人不等待其他人直接开始时，剩余席位自动保持 AI 模式。
 - 主持人席位不可认领：`409 SEAT_NOT_CLAIMABLE`（否则一场圆桌没有主持人推进）。
 - 单场仅允许用户占一个席位：认领新席位会自动释放旧席位（同一事务）。
 
@@ -266,7 +275,13 @@ data: {"code":"LLM_TIMEOUT","retriable":true,"keptVersion":1}
     "claims": [{ "seatId": "st_2", "name": "陈立", "points": ["…"], "sourceMessageIds": ["ms_07"] }],
     "disputes": [{ "question": "冷启动数据是否足够", "sideA": { "seats": ["st_4"], "argument": "…" },
                    "sideB": { "seats": ["st_2"], "argument": "…" }, "unresolvedBecause": "缺少 A/B 数据" }],
-    "hypotheses": ["若 7 日内 CTR 提升 < 3%，则方案不成立"]
+    "hypotheses": ["若 7 日内 CTR 提升 < 3%，则方案不成立"],
+    "meta": {
+      "rounds": 6, "seatCount": 5, "messageCount": 34, "durationSec": 1820,
+      "generatedAt": "2026-11-17T09:01:00.000Z",
+      "participants": ["沈知远（圆桌主持人）", "陈立（战略顾问）"],
+      "userQuestions": ["迁移成本按什么口径算？"]
+    }
   },
   "createdAt": "2026-11-17T09:01:00.000Z"
 }

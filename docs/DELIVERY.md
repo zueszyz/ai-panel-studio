@@ -36,7 +36,7 @@
 | **≥5 条高质量样例数据**（预设讨论话题 + 对应嘉宾阵容） | `V3` 1 场已结束圆桌（含六段纪要）+ `V4` 5 场预设圆桌：AI 技术选型 / 定价策略 / 招聘取舍 / 内容策略 / 组织调整，每场 4 席位（1 主持 + 3 专家，立场互补） | ✅ 已实现（共 6 场） |
 | **开发文档**（PRD、ER 图等，md + mermaid） | 9 份 md，含分层架构图、回合调度时序图、SSE 多路复用图、ER 图、状态机图 | ✅ 已实现 |
 | **API 文档** | springdoc-openapi → `/swagger-ui.html`；手写契约 [API.md](API.md)（18 接口 + 13 类主事件流 + 4 类组局流 + 错误码） | ✅ 已实现 |
-| **测试代码** | JUnit 5 单测 + MockMvc 集成（80 例全绿，覆盖 I-1~I-15）；Playwright E2E 5 条（`pnpm -C e2e test` 约 35s，假模型驱动） | ✅ 已实现 |
+| **测试代码** | JUnit 5 单测 + MockMvc 集成（84 例全绿，覆盖 I-1~I-15）；Playwright E2E 5 条（`pnpm -C e2e test` 约 35s，假模型驱动） | ✅ 已实现 |
 | **README** 含：运行指南 / 环境变量配置 / 技术选型说明 / API 列表 / 已完成能力与后续改进方向 | README §5 运行、`.env.example` 环境变量、§3 选型、§6 API 索引、§8 差异；「已完成 / 后续改进」见 §2.4 | ✅ 已实现 |
 | **Git 提交历史呈层级演进**（如 `docs/schema → ui-components → tests → feat: logic`） | 提交按 `docs → chore → feat(db) → feat(server) → feat(web) → test → fix` 分层推进，共 52 次（`docs/git-history.txt` 已导出） | ✅ 已实现 |
 
@@ -143,7 +143,7 @@ zip -r ai-panel-studio.zip . -x "*/node_modules/*" "*/target/*" "data/*"
 | 在不同阶段合理使用不同开发范式，避免大模型幻觉 | 六段推进 + 四范式（SDD/DDD/TDD/E2E）；每阶段先契约后实现，AI 输出必过测试 | WORKFLOW §2、PROMPT_LOG §4.1 |
 | 基于业务需求驱动数据建模，与 API 契约精确对应 | 7 表 + 18 接口 + SSE 13 类事件，一一映射到 FR-1~FR-9（DATABASE §8、PRD §4.5） | DATABASE、API、PRD |
 | 以演播厅视觉与交互驱动前端组件与状态流转 | 三色席位 + 状态点 + 消息流 + 轨迹时间线；四档响应式、区域独立滚动 | PRD §8、README §2.2 |
-| 核心逻辑遵循 TDD，含完整 E2E | 单测覆盖 SpeakerPolicy/ContextBuilder/状态机；80 例单测与集成 + 5 条 Playwright E2E | TESTING §2–§4 |
+| 核心逻辑遵循 TDD，含完整 E2E | 单测覆盖 SpeakerPolicy/ContextBuilder/状态机；84 例单测与集成 + 5 条 Playwright E2E | TESTING §2–§4 |
 | 考察 Prompt 结构化表达与引导 AI 解决工程问题 | 记录含"意图/挑战/修正"；7 条走偏案例（含依据版本搞错） | PROMPT_LOG §3/§5 |
 | UI 是否真的像在旁观一场演播厅讨论 | 席位/轨迹/引用/新发言提示等细节；布局与信息密度贴合讨论场景 | PRD §8 |
 

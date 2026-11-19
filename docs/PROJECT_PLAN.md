@@ -229,6 +229,6 @@
 | DoD 接口数 | 计划写 18，API.md 与 Controller 实为 19 | 已回改为 19（新增软删除 / 再来一场 / 阶段性小结参数） |
 | DoD 单 jar 演示 | `scripts/build.sh` 通过，含前端静态资源 | 已验证；最近一次变更后需重新执行构建再录制 |
 
-**自动化门禁**：`mvn test` 80 例全绿；`pnpm -C web build` 通过；`pnpm -C e2e test` 5 条全绿；`node scripts/stress.mjs` 20 场完成、`sqliteBusy=0`。
+**自动化门禁**：`mvn test` 84 例全绿；`pnpm -C web build` 通过；`pnpm -C e2e test` 5 条全绿；`node scripts/stress.mjs` 20 场完成、`sqliteBusy=0`。
 
 **仍待人工**：工作流程截图、演示视频、邮件投递三项不属于代码产出，未伪造替代。
