@@ -1,0 +1,52 @@
+c686eb6 2026-11-18 feat(server): build session actor with serial scheduling and parallel agents
+27b17a9 2026-11-17 docs(screenshots): refresh lobby and panel captures across four breakpoints
+4a124de 2026-11-17 style(web): use three columns on wide screens and tokenize accent borders
+638cafa 2026-11-17 docs(readme): mark m1 and lobby/panel modules as implemented
+c6d333b 2026-11-17 docs: sync m2 contracts, seed data and screenshots
+60a2a7c 2026-11-17 feat(web): build panel page with streaming seats and claim
+3b4ae73 2026-11-17 feat(web): build lobby with filters, search and four states
+7f30740 2026-11-17 feat(server): stream panel generation seat by seat with preset fallback
+0d3a16e 2026-11-17 feat(server): add lobby endpoints with cursor pagination and seat claims
+ac26e49 2026-11-17 feat(db): add five sample discussions for lobby demo
+02c3de0 2026-11-17 fix(server): use immediate transactions to avoid sqlite snapshot conflicts
+bfab135 2026-11-17 docs: sync api codes, flyway note and prompt log with m1
+3672dc3 2026-11-17 chore(scripts): add local dev and single-jar build scripts
+a7c75ae 2026-11-17 chore(web): scaffold vue3 with vite, router, pinia and design tokens
+0c415b0 2026-11-17 feat(server): add unified errors, health and metrics endpoints
+94c806c 2026-11-17 feat(db): add flyway schema, indexes and demo seed for sqlite
+954828b 2026-11-17 chore(server): add maven project with spring boot 3.5.16
+b96de20 2026-11-17 docs: link constraint files from readme, delivery and plan
+e576ec9 2026-11-17 chore(rules): add agent constraint files with visual and module gates
+558ce8b 2026-11-17 docs: remove frontend framework discussion and keep implementation facts
+d033f1d 2026-11-17 docs: fix ui constraint wording and log version mismatch
+5abcadf 2026-11-17 docs(test,plan): add isolation and key cases, rebalance scoring effort
+382f508 2026-11-17 docs(delivery,workflow): align with current brief and add process writeup
+d6c2677 2026-11-17 docs(arch,prd): add multi-discussion isolation, key boundary and scroll-container layout
+e4c68eb 2026-11-17 docs(adr): re-evaluate element plus against current spec and keep hand-written ui
+4b4edcb 2026-11-17 docs(log): record ui framework evaluation and reversal
+f6f25c1 2026-11-17 docs(test,plan,delivery): align selectors, wbs and scoring with hand-written ui
+884819b 2026-11-17 docs(prd,arch): add chinese ui spec and record ui library rejection
+4fd6f7a 2026-11-17 docs(adr): evaluate element plus and decide to hand-write ui
+a60390c 2026-11-17 docs(log): record mybatis-plus and delivery-material decisions
+5452993 2026-11-17 docs(plan,test,api): add scale mapping and pre-delivery self-check
+8f97f82 2026-11-17 docs: map assignment requirements and declare four deviations
+f5f57c1 2026-11-17 docs(delivery): add hard-requirement checklist, package layout and storyboard
+5bc10c4 2026-11-17 docs(arch): add mybatis-plus data access conventions
+bfe6066 2026-11-17 docs(db): unify data access on mybatis-plus with usage rules
+ef7825e 2026-11-17 docs(log): record stack, database and runtime decisions
+6309999 2026-11-17 docs(plan): retarget wbs and commits to spring boot stack
+697f781 2026-11-17 docs(test): switch to junit/mockmvc/wiremock and local runtime
+6ad7895 2026-11-17 docs(api): add sseemitter conventions and sqlite search note
+33665ac 2026-11-17 docs(db): redesign schema for sqlite with flyway and partial indexes
+3fbde66 2026-11-17 docs(arch): rewrite layering, thread model and sqlite constraints for spring stack
+6dbb115 2026-11-17 docs(prd): pin stack constraints and no-container runtime, v1.2
+2248bb2 2026-11-17 docs(stack): switch to spring boot 3.5.16 / jdk 17 / vue 3 / sqlite, drop docker
+19c09b0 2026-11-17 docs(log): add prompt and tool-call trace with ai usage boundary
+ce63f6d 2026-11-17 docs(plan): add milestones, WBS and 30+ commit breakdown
+3b24bb5 2026-11-17 docs(test): design 5 e2e cases and 12 integration cases
+0aab9e6 2026-11-17 docs(api): define 15 endpoints, SSE event protocol and error codes
+d54f8ff 2026-11-17 docs(db): add ER diagram, 7-table schema and index design
+f471929 2026-11-17 docs(arch): add session actor, turn scheduling and SSE multiplexing design
+1c7f0a0 2026-11-17 docs(prd): define positioning, users, FR-1~FR-9 with acceptance criteria
+db3d76a 2026-11-17 docs: add README with product overview, stack and doc index
+bf681d5 2026-11-17 chore: init repo with gitignore for node/ts/prisma artifacts

@@ -32,13 +32,13 @@
 
 | 要求 | 本项目落地 | 状态 |
 | --- | --- | --- |
-| 代码 + **数据库初始化脚本** | Flyway `V1__schema.sql`（7 表）/ `V2__indexes.sql` / `V3__seed_demo.sql`，启动即迁移 | ✅ 脚本已设计，待编码 |
-| **≥5 条高质量样例数据**（预设讨论话题 + 对应嘉宾阵容） | `V4__seed_demo.sql` 提供 **5 场**预设圆桌：AI 技术选型 / 定价策略 / 招聘取舍 / 内容策略 / 组织调整，每场含 4 席位（1 主持 + 3 专家，立场互补）+ 开场消息 | 待编码 |
-| **开发文档**（PRD、ER 图等，md + mermaid） | 9 份 md，含分层架构图、回合调度时序图、SSE 多路复用图、ER 图、状态机图 | ✅ |
-| **API 文档** | springdoc-openapi → `/swagger-ui.html`；手写契约 [API.md](API.md)（17 接口 + 13 类 SSE 事件 + 错误码） | ✅ 契约完成 |
-| **测试代码** | JUnit 5 单测 + MockMvc 集成（I-1~I-15）+ Playwright E2E（5 条） | 待编码 |
-| **README** 含：运行指南 / 环境变量配置 / 技术选型说明 / API 列表 / 已完成能力与后续改进方向 | README §5 运行、`.env.example` 环境变量、§3 选型、§6 API 索引、§8 差异；「已完成 / 后续改进」见 §2.4 | ✅ 主体完成 |
-| **Git 提交历史呈层级演进**（如 `docs/schema → ui-components → tests → feat: logic`） | 提交按 `docs → chore → feat(db) → feat(server) → feat(web) → test → fix` 分层推进，共 27 次（规划 53 次） | 进行中 |
+| 代码 + **数据库初始化脚本** | Flyway `V1__schema.sql`（7 表）/ `V2__indexes.sql` / `V3__seed_demo.sql` / `V4__seed_examples.sql` / `V5__discussion_regen_count.sql`，启动自动迁移 | ✅ 已实现 |
+| **≥5 条高质量样例数据**（预设讨论话题 + 对应嘉宾阵容） | `V3` 1 场已结束圆桌（含六段纪要）+ `V4` 5 场预设圆桌：AI 技术选型 / 定价策略 / 招聘取舍 / 内容策略 / 组织调整，每场 4 席位（1 主持 + 3 专家，立场互补） | ✅ 已实现（共 6 场） |
+| **开发文档**（PRD、ER 图等，md + mermaid） | 9 份 md，含分层架构图、回合调度时序图、SSE 多路复用图、ER 图、状态机图 | ✅ 已实现 |
+| **API 文档** | springdoc-openapi → `/swagger-ui.html`；手写契约 [API.md](API.md)（18 接口 + 13 类主事件流 + 4 类组局流 + 错误码） | ✅ 已实现 |
+| **测试代码** | JUnit 5 单测 + MockMvc 集成（57 例全绿，覆盖 I-1~I-14）；Playwright E2E 5 条（`pnpm -C e2e test` 约 35s，假模型驱动） | ✅ 已实现 |
+| **README** 含：运行指南 / 环境变量配置 / 技术选型说明 / API 列表 / 已完成能力与后续改进方向 | README §5 运行、`.env.example` 环境变量、§3 选型、§6 API 索引、§8 差异；「已完成 / 后续改进」见 §2.4 | ✅ 已实现 |
+| **Git 提交历史呈层级演进**（如 `docs/schema → ui-components → tests → feat: logic`） | 提交按 `docs → chore → feat(db) → feat(server) → feat(web) → test → fix` 分层推进，共 52 次（`docs/git-history.txt` 已导出） | ✅ 已实现 |
 
 ### 2.2 核心 Prompt 记录文档（必须 ≥5 段，四范式齐全）
 
@@ -141,9 +141,9 @@ zip -r ai-panel-studio.zip . -x "*/node_modules/*" "*/target/*" "data/*"
 | 考察点 | 我们的应对 | 证据 |
 | --- | --- | --- |
 | 在不同阶段合理使用不同开发范式，避免大模型幻觉 | 六段推进 + 四范式（SDD/DDD/TDD/E2E）；每阶段先契约后实现，AI 输出必过测试 | WORKFLOW §2、PROMPT_LOG §4.1 |
-| 基于业务需求驱动数据建模，与 API 契约精确对应 | 7 表 + 17 接口 + SSE 13 类事件，一一映射到 FR-1~FR-9（DATABASE §8、PRD §4.5） | DATABASE、API、PRD |
+| 基于业务需求驱动数据建模，与 API 契约精确对应 | 7 表 + 18 接口 + SSE 13 类事件，一一映射到 FR-1~FR-9（DATABASE §8、PRD §4.5） | DATABASE、API、PRD |
 | 以演播厅视觉与交互驱动前端组件与状态流转 | 三色席位 + 状态点 + 消息流 + 轨迹时间线；四档响应式、区域独立滚动 | PRD §8、README §2.2 |
-| 核心逻辑遵循 TDD，含完整 E2E | 单测覆盖 SpeakerPolicy/ContextBuilder/状态机；5 条 E2E + 15 条集成 | TESTING §2–§4 |
+| 核心逻辑遵循 TDD，含完整 E2E | 单测覆盖 SpeakerPolicy/ContextBuilder/状态机；57 例单测与集成 + 5 条 Playwright E2E | TESTING §2–§4 |
 | 考察 Prompt 结构化表达与引导 AI 解决工程问题 | 记录含"意图/挑战/修正"；7 条走偏案例（含依据版本搞错） | PROMPT_LOG §3/§5 |
 | UI 是否真的像在旁观一场演播厅讨论 | 席位/轨迹/引用/新发言提示等细节；布局与信息密度贴合讨论场景 | PRD §8 |
 
@@ -154,7 +154,7 @@ zip -r ai-panel-studio.zip . -x "*/node_modules/*" "*/target/*" "data/*"
 | 项 | 旧版说明 | 现行版说明 | 本项目执行 |
 | --- | --- | --- | --- |
 | 数据库 | 未指定 | **SQLite** | SQLite ✅ |
-| 交付物 | 11 项（含 ≥30 commit、≥3 E2E、3–5 分钟视频） | 3 项（源码+文档 / Prompt 记录 ≥5 段 / 工作流程说明） | 以本版为主，旧版数量要求作为加分项超额完成（7 表/17 API/5 E2E/27→53 commit） |
+| 交付物 | 11 项（含 ≥30 commit、≥3 E2E、3–5 分钟视频） | 3 项（源码+文档 / Prompt 记录 ≥5 段 / 工作流程说明） | 以本版为主，旧版数量要求作为加分项超额完成（7 表/18 API/52 commit） |
 | 提交 | handshake@gaodun.cn，主题【AI开发实习生-姓名-岗位】 | **xulei@wisqwest.com**，主题【远程作业提交】姓名 | 按现行版 |
 
 ---
@@ -162,8 +162,8 @@ zip -r ai-panel-studio.zip . -x "*/node_modules/*" "*/target/*" "data/*"
 ## 8. 交付前 24 小时检查表
 
 - [ ] 删 `data/panel-studio.db` 重启能自动建库 + 5 场样例数据（证明初始化脚本与数据质量）
-- [ ] `/swagger-ui.html` 可访问，endpoint 数量与 API.md 一致（17）
-- [ ] 3 张核心页面截图入 `docs/screenshots/` 并嵌入 README §2.2
+- [ ] `/swagger-ui.html` 可访问，endpoint 数量与 API.md 一致（18）
+- [ ] 4 个核心页面截图入 `docs/screenshots/` 并嵌入 README §2.2（大厅 / 组局 / 现场 / 纪要，含窄屏）
 - [ ] PROMPT_LOG 覆盖四范式，且每段有"意图/挑战/修正"
 - [ ] `AGENTS.md` + `rules/`（6 份）随仓库交付，且与实现一致（约束不是摆设）
 - [ ] WORKFLOW.md 1–1.5 页，含 3 个典型问题与效率台账

@@ -15,8 +15,8 @@
 | 层 | 工具 | 覆盖对象 | 目标 |
 | --- | --- | --- | --- |
 | 单元 | JUnit 5 + AssertJ + Mockito | `SpeakerPolicy`、`ContextBuilder`、`DiscussionStateMachine`、JSON 修复器、ULID 生成器 | 策略可解释、边界明确、无 IO |
-| 集成 | `@SpringBootTest` + MockMvc + 临时 SQLite（每类一个临时文件）+ WireMock | 17 个接口的状态码、幂等、事务、SSE 帧序列 | 契约不被破坏 |
-| E2E | Playwright（Node） | 真实浏览器 + 真实前后端（`java -jar` 或 `spring-boot:run`）+ WireMock | 主链路可交付 |
+| 集成 | `@SpringBootTest` + MockMvc + 临时 SQLite（每类一个临时文件）+ WireMock | 18 个接口的状态码、幂等、事务、SSE 帧序列 | 契约不被破坏 |
+| E2E | Playwright（Node）+ `e2e/mock-llm.mjs` | 真实浏览器 + 真实前后端（`spring-boot:run`）+ OpenAI 兼容假模型 | 5 条主链路全绿，`pnpm -C e2e test` 一条命令跑完 |
 | 前端单测 | Vitest（可选） | SSE 解析器（跨 chunk 截断）、store 去重逻辑 | 流式解析不出错 |
 
 ### 1.1 LLM 如何 Mock（关键）
@@ -42,7 +42,12 @@ stubFor(post(urlEqualTo("/v1/chat/completions"))
 ```
 
 - 测试 profile：`application-test.yml` 把 `LLM_BASE_URL` 指向 `http://localhost:${wiremock.port}/v1`。
-- 生产/演示：真实 provider；E2E 走 WireMock，保证"3 条用例永远绿"，不因模型抽风而假红。
+- 生产/演示：真实 provider；E2E 走假模型，保证"5 条用例永远绿"，不因模型抽风而假红。
+
+> **E2E 用的是另一套假模型**：`e2e/mock-llm.mjs` 起一个 OpenAI 兼容端点（默认 `:9099`），
+> 按 `PromptTemplates` 里的标记（`SEAT_INDEX` / `你叫…` / `你是这场圆桌会议的主笔`）分派固定脚本，
+> 服务端不需要任何测试专用分支，只把 `LLM_BASE_URL` 指过去即可。
+> 延迟也是脚本化的：周敏 600ms、陈立 1800ms —— 用来断言"快的先结束、慢的不挡快的"。
 
 ### 1.2 SQLite 在测试中的处理
 
@@ -58,6 +63,8 @@ stubFor(post(urlEqualTo("/v1/chat/completions"))
 
 ## 2. E2E 用例
 
+> **状态**：5 条全部实现于 `e2e/specs/`，`pnpm -C e2e test` 约 35s 跑完（含启动前后端）。
+>
 > **定位策略**：断言只用两类锚点 —— ① `data-testid`（业务语义，如 `seat-card`、`message-bubble`）；② 中文文案（`getByText('发起圆桌')`）。**不断言样式 class 名**：样式由本项目手写并会随视觉调整变化，锚在语义属性上才稳。
 
 ### E2E-1 组局 → 生成席位 → 认领 → 开场（主链路 A）
@@ -106,8 +113,8 @@ WireMock 令 `st_3` 超时（`withFixedDelay(60000)`）。断言：该卡片「�
 | I-5 | `messages` 幂等 | 同 `clientMsgId` 两次 → 一条消息、只触发一轮调度 |
 | I-6 | 非 LIVE 发言 | `DRAFT` → 409 `DISCUSSION_NOT_LIVE` |
 | I-7 | `end` 后发言 | 410 `DISCUSSION_CLOSED` |
-| I-8 | minutes 版本 | 连生两次 → `version` 1、2；`?version=1` 可取旧版 |
-| I-9 | minutes 失败不覆盖 | WireMock 超时 → 旧版仍 `READY`，响应含 `keptVersion` |
+| I-8 | minutes 版本 | 连生两次 → `version` 1、2；`?version=1` 可取旧版（`MinutesApiIntegrationTest#shouldVersionMinutes`） |
+| I-9 | minutes 失败不覆盖 | 模型连续返回非 JSON → 旧版仍 `READY`，流里含 `keptVersion`（`#shouldKeepPreviousVersionOnFailure`） |
 | I-10 | 预算耗尽 | 打满 `budget` → 402 `BUDGET_EXHAUSTED`，已有消息可读 |
 | I-11 | SSE 续传 | 带 `Last-Event-ID` 重连 → 不丢不重 |
 | I-12 | 软删除 | 删除后列表不出现；直链 410 |
@@ -145,31 +152,32 @@ WireMock 令 `st_3` 超时（`withFixedDelay(60000)`）。断言：该卡片「�
 ## 6. 执行方式
 
 ```bash
-# 后端：单元 + 集成（Flyway 建临时库，WireMock 内嵌）
+# 后端：单元 + 集成（Flyway 建临时库，WireMock 内嵌，57 例）
 mvn -f server/pom.xml test
 
-# 前端
-pnpm -C web test            # Vitest（SSE 解析器、store）
+# 前端：vue-tsc 类型检查 + 构建（Vitest 未接入，前端行为由 E2E 覆盖）
+pnpm -C web build
 
-# E2E：需要先启动后端（WireMock profile）+ 前端
-mvn -f server/pom.xml spring-boot:run -Dspring-boot.run.profiles=e2e
-pnpm -C web dev
-pnpm -C e2e test            # Playwright；失败保留 trace/video
+# E2E：一条命令拉起「假模型 → 干净库 + 后端 → 前端」，跑完自动收尾
+pnpm -C e2e test
 ```
 
-- E2E 每条用例自建 `discussion`（走 API 预置），互不干扰；`afterEach` 清理。
-- 失败保留 `trace: 'retain-on-failure'` + 截图，便于复盘。
-- 顺序（本地/CI 同）：`mvn -q -DskipTests package` → `mvn test` → `pnpm -C web build` → Playwright。
-- 不使用容器：E2E 依赖的"服务"就是本机两个进程 + 内嵌 WireMock。
+- E2E 的环境由 `e2e/global-setup.ts` 统一拉起：删 `e2e/.tmp/e2e.db` → 假模型 `:9099` → 后端 `:8080` → 前端 `:5173`；
+  跑之前确保这三个端口没被 `scripts/dev` 占用。
+- 每条用例自建 `discussion`（走 API 预置），互不干扰；结束不做清理，由下一次 globalSetup 删库。
+- 失败只留截图（`screenshot: 'only-on-failure'`），trace/video 默认关闭：单次失败会产生上百个小文件，
+  本机安全策略会拦截批量删除，清理阶段容易卡住；需要复盘时临时在 `playwright.config.ts` 打开。
+- 顺序（本地/CI 同）：`mvn test` → `pnpm -C web build` → `pnpm -C e2e test`。
+- 不使用容器：E2E 依赖的"服务"就是本机三个进程（含一个假模型）。
 
 ---
 
 ## 7. 交付前自检（打包前必跑）
 
-- [ ] `mvn -f server/pom.xml test` 全绿（单元 + 集成 13 条，含 SQLite 并发写）
-- [ ] `pnpm -C e2e test` 全绿（5 条；若时间紧张，至少 E2E-1/2/3）
+- [ ] `mvn -f server/pom.xml test` 全绿（单元 + 集成 57 条，含 SQLite 并发写）
+- [ ] `pnpm -C e2e test` 全绿（5 条，约 35s）
 - [ ] 删除 `data/panel-studio.db` 后重启，Flyway 三个脚本自动建库并 seed 成功（证明"数据库初始化脚本"可交付）
-- [ ] `/swagger-ui.html` 可访问，接口数量与 [API](API.md) §1 一致（17 个）
+- [ ] `/swagger-ui.html` 可访问，接口数量与 [API](API.md) §1 一致（18 个）
 - [ ] `git log --oneline | wc -l` ≥ 30，且 `docs/git-history.txt` 已导出
 - [ ] 压缩包不包含 `node_modules/`、`server/target/`、`data/`
 - [ ] 录屏用的场景 = E2E-2（两路并行流式），确保视频里能看到"不阻塞"

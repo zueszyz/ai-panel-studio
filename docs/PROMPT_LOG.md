@@ -282,8 +282,84 @@
 
 ---
 
-## 4. 关键决策点索引
+### R-017 · 全量核查 + M4 收敛（2026-11-19 00:40–02:10）
 
+- **阶段**：M4（收敛，模块 7）+ 一次跨模块核查
+- **目标**：按 PRD/API/ARCHITECTURE/DATABASE/TESTING/rules 逐项核对现状，把「契约有、代码没有」的部分补齐，并修掉核查中暴露的正确性缺陷。
+- **Prompt（摘要）**：> 以文档为验收条件核查整个项目，列出问题后动手修；不要只写报告。红线优先：不在事务里调模型、失败不能影响全场、纪要必须可溯源且失败不覆盖旧版本。
+- **核查结论（问题清单）**：
+  1. **纪要模块整体缺失**：`POST/GET /discussions/:id/minutes` 不存在、`minutes` 表没有实体与 Mapper、`Minutes.vue` 是占位页 → FR-7（P0）未交付，API 声明 17 个接口实际只有 15 个；
+  2. **`SseRegistry` 并发缺陷**：`publish` 的 `addLast` 与 `trim` 用的是两把不同的锁（后者 `synchronized`），多 agent 并行推送时并发修改 `ArrayDeque`，会丢帧甚至抛 `ConcurrentModificationException`；
+  3. **收束消息 id 对不上**：`runDigest` 先发布 `digest.start`（新生成一个 id），随后 `runSeat(host, null, …)` 又让 `AgentRunner` 生成第二个 id → 前端点轨迹定位不到这条收束；
+  4. **`start()` 先改状态再校验席位**：席位为空时抛异常但状态已被写成 `LIVE`；
+  5. **现场页违反布局硬约束**：`.page { height:100%; overflow-y:auto }` + 内部 `max-height:62vh`，实际是整页滚动，rules/20 §6 的「三区独立滚动 + 输入区固定」没有落实。
+- **产出**：
+  - 后端：`domain/entity/MinuteEntity`、`infra/mapper/MinuteMapper`、`application/minutes/MinutesService`、`api/MinutesController`、`api/dto/MinuteDtos`、`PromptTemplates.minutesSystem/minutesUser`；`SseRegistry` 并发修正；`SessionActor.runDigest` id 统一；`DiscussionSessionService.start` 顺序调整。
+  - 前端：`pages/Minutes.vue`（六段渲染 + 溯源跳转 + 版本切换 + 复制 Markdown）、`lib/minutes.ts`、`stores/minutes.ts`；`pages/Live.vue` 重写为固定视口三栏 + 窄屏轨迹抽屉；`SeatRail` 支持横排。
+  - 测试：`MinutesApiIntegrationTest`（I-8 / I-9 / 未结束拒绝生成）。
+- **人工决策点** `[me]`：
+  1. **纪要 Markdown 由服务端模板渲染**，不让模型直接产出 md：模型只给结构化 JSON，六段标题与排版由代码保证，避免"同一版本两处不一致"；
+  2. **`sourceMessageIds` 落库前清洗**：模型给的 id 必须能在本场 messages 里查到，否则剔除；`seatId` 认不出时按姓名回退一次，仍认不出就丢掉这条 claim —— 宁可少一条，不可张冠李戴；
+  3. **失败不写行**：生成失败只回 `minutes.failed + keptVersion`，不插入 `GENERATING/FAILED` 行，避免版本号被失败消耗、旧版本被遮住；
+  4. **无密钥时给「离线摘要」**：只从本场真实发言摘录，并在 `minutes.done` 标 `fallback:"LOCAL"`、前端打「离线摘要」徽标。理由：单 jar 演示不能因为没配 Key 就完全出不了纪要；但不能伪装成模型结论。
+- **验证方式（命令 + 结果）**：
+  - `mvn -f server/pom.xml test` → **57 例全绿**（新增 3 例：版本自增与旧版可取、失败不覆盖且带 `keptVersion`、未结束生成返回 409 / 无纪要 404；另补 1 例单条重试）；
+  - `pnpm -C web build` → 通过（`Minutes` / `Live` 分包正常产出）；
+  - 断言口径：纪要点里的 `sourceMessageIds` 必须是本场消息 id（用 `/stream` 的 snapshot 反查比对），不是"看起来像"。
+- **结论**：FR-7 主链路（生成 → 落库 → 版本 → 溯源 → 刷新一致）打通，FR-9 的单条重试也补齐（`POST /messages/:messageId/retry`）。仍遗留：E2E 用例（`e2e/specs` 只有 README）、`SQLITE_BUSY` 应用层退避，见 §5 新增 F-8~F-11。
+
+---
+
+### R-018 · 前端视觉打磨 + 文档同步（2026-11-19 02:20–03:30）
+
+- **阶段**：M5（质量）中的视觉与文档部分
+- **目标**：让四个页面达到 rules/20 的「演播厅」观感，并把文档里的状态、数量、截图口径对齐实现。
+- **Prompt（摘要）**：> 对前端页面做美化，但要守住红线：不引组件库、主色不超过两种、不用位移动画堆特效、四档断点不能出横向滚动条；顺手把文档里"待编码""17 接口"这类过期口径改掉。
+- **产出**：
+  - 令牌与原语：`tokens.css` 增 `--glow-*`（静态灯位）、`--primary-line`、`--*-soft`、`--radius-xl`、`--text-3xl`、`--copy-max`、`--shadow-inset`；`base.css` 重写按钮/卡片/输入/横幅/徽标/eyebrow，新增 `.btn--lg`、`.badge--accent/--muted/--count`、`.banner--*`。
+  - 页面：大厅改为「演播厅开场区（标题 + 3 条事实）+ 筛选 + 状态色卡片」；组局把议题分析做成议题卡（目标是主句，争议/视角是两种标签），席位卡加角色 chip、立场引号、席位色标签、认领态；现场页补席位"正在发言"高亮、失败卡片原因、状态与轨迹一致；纪要页加版本/生成时间条、分节左标尺、要点 marker。
+  - 交互：路由 120ms 淡入；对话框 head/foot 分隔与统一圆角。
+- **人工决策点** `[me]`：
+  1. **不用组件库**：rules/20 明确禁止；四页只需要 8 个原语，自建比引入一套主题变量更可控；
+  2. **背景光用静态径向渐变**：`rules/20 §8` 只允许三处动效，灯位感靠静态渐变 + 分隔高光，不做位移；
+  3. **`ch` 换成 px 令牌**：中文在 `ch` 单位下的宽度失真（20ch ≈ 360px），把标题/正文的最大宽度统一到 `--reading-max` / `--copy-max`，并用 `text-wrap: balance` 消除"孤字换行"；
+  4. **失败卡片显示原因而不是只弹横幅**：PRD 要求"原因 + 下一步"，卡片内显示 `message.error`，连续两条失败才升级为页面级横幅。
+- **验证方式（命令 + 结果）**：
+  - `pnpm -C web lint` → 0 error 0 warning；`pnpm -C web build` → 通过（`vue-tsc` 无类型错误）；
+  - `node e2e/screenshot.mjs` → 8 张截图（4 页 × 桌面/窄屏），四档断点 `no horizontal overflow`；
+  - 人工核对截图：大厅/组局/现场/纪要四页的层级、对比度、席位三色一致性；
+  - 清空 `data/panel-studio.db` 重启 → Flyway 重建 6 场种子，截图里不再出现测试残留的重复圆桌。
+- **结论**：视觉达到 rules/20 的自查口径；文档同步见 §5 的 F-12~F-13 与 DELIVERY/README 的状态更新。E2E 用例仍是唯一未落地的门禁项。
+
+---
+
+### R-019 · E2E 落地（M5）（2026-11-19 11:00–12:10）
+
+- **阶段**：M5（质量）的最后一处门禁
+- **目标**：把 `docs/TESTING.md` §2 的 5 条 E2E 真正跑起来，且不依赖真实模型与 API Key。
+- **Prompt（摘要）**：> 用 Playwright 把主链路跑通；断言要能证明"并行不阻塞""失败可重试""断线能恢复"，不要截图式断言；整套环境一条命令拉起，跑完自己收尾。
+- **产出**：
+  - `e2e/mock-llm.mjs`：OpenAI 兼容假模型（`:9099`），按 Prompt 标记分派固定脚本，延迟可脚本化（周敏 600ms / 陈立 1800ms），并支持"只失败一条"的故障注入；
+  - `e2e/global-setup.ts`：假模型 → 删临时库 → 后端 → 前端，按序拉起并注册收尾；
+  - `e2e/specs/`：5 条用例 + `helpers.ts`（API 预置数据、等轨迹落定）；
+  - `e2e/clean.mjs`：逐文件清理产物（见下方环境约束）。
+- **人工决策点** `[me]`：
+  1. **不用 config 里的 `webServer`**：它无法保证"先删库再启后端"的顺序，删到正在写的库会直接毁数据；改用 globalSetup 自己编排；
+  2. **假模型不引 WireMock standalone**：一个 200 行的 Node 脚本就能按 Prompt 标记分派，不给前端工程加依赖；服务端零测试专用分支，只改 `LLM_BASE_URL`；
+  3. **断言"快的先结束 + 慢的还在流"**，而不是"两者首字时间差 < 3s"：前者是并发正确性的直接证据，后者受机器负载影响；
+  4. **E2E-5 用拦截 `/stream` 制造连不上**，不用 `setOffline`：断网模拟对已建立的长连接不生效（心跳仍在流动），会造出永远等不到断线的假红。
+- **顺带修掉的真问题**（详见 §5 F-14 / F-15）：
+  1. 用户插话可能被排在专家回答之后（列表靠到达顺序 push）；
+  2. SSE 半开连接没有任何感知，且重连失败 3 次就永久放弃 —— 讨论现场等于"静默死亡"。
+- **验证方式（命令 + 结果）**：
+  - `pnpm -C e2e test` → **5 passed（35.0s）**，含启动假模型/后端/前端；
+  - `mvn -f server/pom.xml test` → 57 例全绿；`pnpm -C web build` → 通过；
+  - 断言落点：`data-status` / `data-name` / `data-message-id` 三个语义属性 + 中文文案，不依赖样式 class。
+- **结论**：M5 门禁达成（5 条 E2E 全绿），交付清单里"测试代码"一项可勾。
+
+---
+
+## 4. 关键决策点索引
 | # | 决策 | 结论 | 记录 | 主要影响文件 |
 | --- | --- | --- | --- | --- |
 | D-1 | 后端技术栈 | Spring Boot 3.5.16 + JDK 17（非 Node） | R-007 | README §3、ARCHITECTURE 全文 |
@@ -318,6 +394,16 @@
 | F-3 | 文档混用 "MyBatis" 与 "MyBatis-Plus" | 易被读成"用原生 MyBatis 手写 SqlSession" | 统一为 MyBatis-Plus 3.5.12，并显式声明"不用原生 / 不用 JPA" | grep `MyBatis[^-]` 仅剩"MyBatis 原生"对比语境 |
 | F-4 | 目录树编辑时误删换行，两行被合并 | 文档排版损坏 | 读取该段落 → 精确重写两行 | `sed` 查看段落确认 |
 | F-5 | 早期 ER 图把轨迹塞进 `messages.extra`（JSON） | 轨迹无法按时间线查询，FR-5 会做不出来 | 独立 `agent_runs` 表（含 trigger/phase/duration） | DATABASE §2.6 + 集成用例 I-11 |
+| F-6 | 手写 `@Select` 查询带 JSON 列的实体，`focus` / `meta` 读回后变空（`[]` / `{}`） | 席位卡不显示关注点、选人打分少一档；轨迹面板技术细节永远为空 | MyBatis-Plus 的 `autoResultMap` 只对内置方法生效，手写 SQL 必须显式 `@ResultMap("mybatis-plus_XxxEntity")`；同时 `updateById(patch)` 会把默认空 List 写回 `'[]'`，状态更新改用 `LambdaUpdateWrapper` 只 set 目标列 | `mvn -f server/pom.xml test` 53 项全绿；新增「认领/撤销不清空 focus」「轨迹 meta 回读」两条回归用例 |
+| F-7 | dev 脚本启动后库落在 `server/data/`，根 `data/` 里是另一份旧库 | 「删 `data/panel-studio.db` 重启」自检失效；接口报 404 而库文件里明明有这条数据；手工修数据修到了错的那个库 | `spring-boot:run` 会把 JVM 工作目录切到 `server/`，相对路径 `SQLITE_PATH` 随之漂移。`scripts/dev.bat` / `dev.sh` 统一把相对路径归一化为「仓库根/data/panel-studio.db」；两份库已合并到根目录 | 启动后 `GET /api/discussions?limit=50` 返回 8 条、`server/data/` 不再生成库文件；`/api/health` 仍 `db=up` |
+| F-8 | `SseRegistry` 的事件缓冲用 `ArrayDeque`，`publish` 无锁 `addLast`、`trim` 单独 `synchronized` | 并行输出时两个 agent 同时写缓冲：可能丢帧，极端情况 `ConcurrentModificationException` 直接打断一次 `publish` | 写入 + 裁剪放进同一把锁（`synchronized (buffer)`），回放也在锁内读，并注释说明"调用方必须持锁" | `mvn test` 全绿；断线续传用例（重连带 `Last-Event-ID`）回放连续 |
+| F-9 | 收束消息 `digest.start` 的 id 是"预生成的一个"，实际消息又是另一个 | 前端点轨迹「主持人收束」定位不到消息（scroll 到空处），FR-5 的联动失效 | `runDigest` 先生成一次 id 并同时传给 `digest.start` 与 `runSeat`，两者必须同一个 | 轨迹条目点击后能定位；`MinutesApiIntegrationTest` 用的同一套事件流断言通过 |
+| F-10 | `start()` 先 `transit(LIVE)` 再检查席位是否为空 | 席位缺失时接口报错但状态已变 LIVE，用户既开不了场也退不回 `PANEL_READY` | 校验前置：先查席位，再迁移状态 | I-6 用例 + 手工删席位场景 |
+| F-11 | Live 页用 `.page{overflow-y:auto}` + `max-height:62vh` 拼出"三栏" | 实际整页滚动，rules/20 §6 的硬约束没达成；窄屏没有轨迹抽屉 | 根容器 `height:100%+overflow:hidden`，`.flow__list` 独立滚动、输入区 `flex:none`；<1280 轨迹改为覆盖式抽屉，<768 席位横排到顶部 | 四档断点手测无整页滚动、无横向滚动条；`pnpm build` 通过 |
+| F-12 | 失败消息卡只有一行"发言中断"，卡片中间一大块空白；刷新后席位栏全显示"等待"，而轨迹面板写着"失败" | 用户不知道发生了什么（PRD 要求"原因 + 下一步"）；FR-5 明说"席位状态必须与消息流一致"，刷新即打脸 | 卡片内显示 `message.error`（无 code 时用"这次没有生成内容，可以重试"）；连续两条失败才升级为页面级横幅；`handleSnapshot` 从消息状态反推席位状态（STREAMING→发言中、FAILED→中断、DONE→完成） | 截图 `03-live.png` 中四个席位均显示"中断"、卡片带原因；Lint/Build 通过 |
+| F-13 | 反复跑 `e2e/screenshot.mjs` 后，截图里出现同一议题的 3 张卡片 | 截图脚本每跑一次就新建一场圆桌，写进了本地库；交付截图看起来像"数据脏" | 截图前用「删库 + Flyway 重建」拿到纯种子数据（顺带验证初始化脚本可交付）；脚本里说明"lobby 截图在创建圆桌之前拍" | 重建后 `GET /api/discussions` 返回 6 条、议题唯一；截图无重复卡片 |
+| F-14 | SSE 只处理"读到错误"，对半开连接无感知；且重连 3 次后就 `onClose('error')` 永久放弃 | 地铁/切网时页面会永远停在旧内容，用户以为"没人说话"，其实是流早断了；恢复网络也不自愈 | ①客户端加 30s 空闲看门狗（服务端心跳 15s）：超时主动 abort 走重连；②重连不再设上限，退避封顶 4s，横幅常驻到恢复为止 | `E2E-5`：拦截 `/stream` → 横幅出现 → 放行后自动重连、快照补齐且无重复气泡 |
+| F-15 | 消息列表按 SSE 到达顺序 `push`，而用户消息的 `message.start` 可能晚于并行专家的 `message.start` | 页面出现"回答在提问之前"，可读性直接崩 | `upsertMessage` 改按 `createdAt` 落位，同毫秒返回 0（保持到达顺序）；不用 ULID 兜底 —— 同毫秒内随机段不单调，反而会排错 | `E2E-2` 断言"插话之后才有专家回复"，此前该用例正是靠这条断言发现的 |
 
 ---
 

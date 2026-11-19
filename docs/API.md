@@ -10,7 +10,7 @@
 | 路径版本 | v1，路径不带版本号；破坏性变更时升 `/api/v2` |
 | 实现 | Spring MVC `@RestController` + `SseEmitter`；DTO 用 `record` + Jakarta Validation；错误统一由 `@RestControllerAdvice` 输出 |
 | 在线文档 | springdoc-openapi 2.x → `GET /swagger-ui.html`（与本文档双向对齐，注解即契约） |
-| 接口数 | 17（REST 14 + SSE 3），满足 ≥8 的要求 |
+| 接口数 | 18（REST 15 + SSE 3），满足 ≥8 的要求 |
 | 规模对照 | 支撑 4 个前端路由（`/` `/panel` `/live` `/minutes`）、7 张表；讨论 CRUD / 消息 / SSE 流式 / 汇总四类能力齐全 |
 
 ---
@@ -30,6 +30,7 @@
 | 9 | POST | `/discussions/:id/start` | 开场，进入 LIVE | JSON |
 | 10 | GET | `/discussions/:id/stream` | 讨论主事件流 | **SSE** |
 | 11 | POST | `/discussions/:id/messages` | 用户发言 / 插话 | JSON |
+| 11b | POST | `/discussions/:id/messages/:messageId/retry` | 单条失败发言重试 | JSON |
 | 12 | POST | `/discussions/:id/turns` | 推进一回合 | JSON |
 | 13 | POST | `/discussions/:id/end` | 结束讨论 | JSON |
 | 14 | POST | `/discussions/:id/minutes` | 生成纪要（流式） | **SSE** |
@@ -175,6 +176,15 @@ POST /api/discussions/dk_2f8a1c/messages
 - 内容 1–1000 字；超过 200 字时自动分条展示但仍作为一条消息。
 - 讨论非 `LIVE`：`409 DISCUSSION_NOT_LIVE`；预算耗尽：`402 BUDGET_EXHAUSTED`。
 
+### 2.6b `POST /discussions/:id/messages/:messageId/retry` 单条重试
+
+```json
+{ "id": "ms_07", "status": "STREAMING", "attempt": 2 }
+```
+
+- 只针对失败/中断的**专家**消息：沿用同一 `messageId` 与 `roundNo` 重新生成，`attempt+1`；前端凭同一 id 把卡片原位改回流式态，不新增气泡。
+- 用户消息不可重试：`409 MESSAGE_NOT_RETRIABLE`；席位正在发言：`409 AGENT_BUSY`；消息不属于本场或不存在：`404 MESSAGE_NOT_FOUND`。
+
 ### 2.7 `POST /discussions/:id/turns` 推进回合
 
 ```json
@@ -207,7 +217,10 @@ data: {"code":"LLM_TIMEOUT","retriable":true,"keptVersion":1}
 ```
 
 - 六段固定 key：`topic` `claims` `disputes` `consensus` `hypotheses` `nextSteps`。
+- 首帧 `minutes.section`（`topic`）不依赖模型，先推出去降低等待感；其余五段在模型返回后按顺序推送。
 - 失败**不覆盖**旧版本（`keptVersion` 告知前端仍可查看哪一版）。
+- 后端未配置模型密钥时走**离线摘要**：只从本场真实消息里摘录，`minutes.done` 带 `"fallback":"LOCAL"`，前端以「离线摘要」标注，不伪装成模型结论。
+- 生成成功即把讨论从 `SUMMARIZING` 收敛为 `CLOSED`（已是 `CLOSED` 则跳过）。
 
 ### 2.10 `GET /discussions/:id/minutes?version=2`
 
@@ -229,6 +242,8 @@ data: {"code":"LLM_TIMEOUT","retriable":true,"keptVersion":1}
 ```
 
 不带 `version` 返回最新且 `status=READY` 的版本；不存在返回 `404 MINUTES_NOT_FOUND`（前端引导"去生成"）。
+
+附加字段：`versions`（可查看的版本号列表，新到旧）供前端做版本切换；`model` / `tokensUsed` 用于展示成本。
 
 ### 2.11 `GET /discussions/:id/runs` 轨迹回放
 
@@ -348,8 +363,9 @@ sse.on('message.delta', ({ messageId, seq, text }) => {
 | HTTP | `code` | 含义 | 可重试 |
 | --- | --- | --- | --- |
 | 400 | `VALIDATION_ERROR` | 参数不合法（带 `details[]`） | 否 |
-| 404 | `DISCUSSION_NOT_FOUND` / `SEAT_NOT_FOUND` / `MINUTES_NOT_FOUND` | 资源不存在 | 否 |
+| 404 | `DISCUSSION_NOT_FOUND` / `SEAT_NOT_FOUND` / `MINUTES_NOT_FOUND` / `MESSAGE_NOT_FOUND` | 资源不存在 | 否 |
 | 409 | `SEAT_TAKEN` | 席位已被认领 | 否（换席位） |
+| 409 | `MESSAGE_NOT_RETRIABLE` / `AGENT_BUSY` | 该消息无需重试 / 席位正在发言 | 是（稍后再试） |
 | 409 | `SEAT_NOT_CLAIMABLE` | 主持人席位不可认领 | 否 |
 | 409 | `DISCUSSION_NOT_LIVE` / `ALREADY_STARTED` / `DISCUSSION_CLOSED` | 状态不允许 | 否 |
 | 410 | `DISCUSSION_DELETED` | 已软删除 | 否 |

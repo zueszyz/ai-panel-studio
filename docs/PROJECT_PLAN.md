@@ -189,7 +189,7 @@
 
 - [ ] `mvn -f server/pom.xml test` 全绿；`pnpm -C web build` 成功；3 条 E2E 全绿（本机，无容器）
 - [ ] `java -jar server/target/panel-studio.jar` 单进程可完整演示（含前端静态资源）
-- [ ] 17 个接口与 API 文档一致（含错误码）；Swagger UI 可访问
+- [ ] 18 个接口与 API 文档一致（含错误码）；Swagger UI 可访问
 - [ ] 7 张表由 Flyway 建出，纪要可从 SQLite 重新读取（重启后仍在）
 - [ ] `git log` ≥ 30 条，message 可读，提交粒度合理
 - [ ] README 含运行说明、架构图、AI 使用说明、边界声明与"不使用容器"的说明

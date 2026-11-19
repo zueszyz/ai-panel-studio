@@ -39,24 +39,25 @@
 
 技术细节（时序图、失败隔离矩阵）见 [ARCHITECTURE](docs/ARCHITECTURE.md) §3.2。
 
-### 2.2 三个核心页面（交付截图位置）
+### 2.2 四个核心页面（交付截图位置）
 
-| 页面 | 路由 | 交付要求 |
+| 页面 | 路由 | 截图 |
 | --- | --- | --- |
-| 讨论列表 | `/` | 至少 1 张截图（含进行中/已结束状态、席位头像组） |
-| 讨论详情 | `/discussions/:id` | 至少 1 张截图（**必须能看出两路并行流式**） |
-| 会议纪要 | `/discussions/:id/minutes` | 至少 1 张截图（六段结构 + 溯源入口） |
+| 圆桌大厅 | `/` | `01-lobby.png`（桌面）、`01-lobby-mobile.png`（390）、`01-lobby-empty.png`（空态）、`01-lobby-wide.png`（1920）、`01-lobby-tablet.png`（1024） |
+| 组局（席位生成） | `/discussions/:id/panel` | `02-panel.png`、`02-panel-mobile.png` |
+| 圆桌现场 | `/discussions/:id` | `03-live.png`（三栏）、`03-live-mobile.png`（单栏 + 席位横滑） |
+| 会议纪要 | `/discussions/:id/minutes` | `04-minutes.png`、`04-minutes-mobile.png` |
 
-截图存放在 `docs/screenshots/`，命名 `01-lobby.png` / `02-live.png` / `03-minutes.png`，并在此处嵌入。
-
-已产出（M2，由 `node e2e/screenshot.mjs` 生成）：
+截图由 `node e2e/screenshot.mjs` 生成，同时校验四档断点没有横向滚动条。已产出：
 
 | 截图 | 说明 |
 | --- | --- |
-| ![大厅](docs/screenshots/01-lobby.png) | 大厅：进行中 / 待开场 / 已结束三种状态，席位头像组与最后一条发言 |
+| ![大厅](docs/screenshots/01-lobby.png) | 大厅：演播厅式开场区 + 筛选/搜索 + 状态色卡片（进行中 / 待开场 / 已结束） |
 | ![发起圆桌](docs/screenshots/01-lobby-dialog.png) | 发起弹层：议题字数实时校验 + 参会人数分段选择 |
-| ![组局](docs/screenshots/02-panel.png) | 组局：议题分析 + 4 张席位卡，含已认领席位（「你」） |
 | ![空态](docs/screenshots/01-lobby-empty.png) | 空态：筛选无结果时给「清空筛选」的下一步 |
+| ![组局](docs/screenshots/02-panel.png) | 组局：议题分析（目标 / 争议焦点 / 关注视角）+ 席位卡，含已认领席位（「你」） |
+| ![现场](docs/screenshots/03-live.png) | 现场：席位栏 / 讨论流 / 行动轨迹三区独立滚动，输入区固定底部 |
+| ![纪要](docs/screenshots/04-minutes.png) | 纪要：六段结构 + 每条主张的溯源入口 + 版本徽标 |
 
 ## 3. 技术栈
 
@@ -173,8 +174,8 @@ ai-panel-studio/
 └── README.md
 ```
 
-> 当前进度：**M1 骨架 + M2（大厅 / 组局）已落地**，`server/` 与 `web/` 可运行（`mvn test` 32 例全绿、`pnpm build` 通过）。
-> M3 讨论内核（`SessionActor` / 并行流式 / 轨迹 / 插话）按 `rules/50` 的模块顺序继续推进，`/discussions/:id` 目前是现场页骨架。
+> 当前进度：**M1 骨架 + M2（大厅 / 组局）+ M3（讨论内核）+ M4（纪要收敛）+ M5（质量）已落地**。
+> 后端 `mvn test` 57 例全绿；前端 `pnpm build` 通过；`pnpm -C e2e test` 5 条 E2E 全绿（约 35s，假模型驱动，不需要 API Key）。
 
 ## 5. 快速开始
 
@@ -196,6 +197,14 @@ mvn -f server/pom.xml spring-boot:run     # 启动即执行 Flyway 迁移
 pnpm -C web install && pnpm -C web dev    # http://localhost:5173
 ```
 
+跑测试（三件套，都不需要容器与真实模型）：
+
+```bash
+mvn -f server/pom.xml test          # 单元 + 集成 57 例
+pnpm -C web build                   # vue-tsc 类型检查 + 构建
+pnpm -C e2e test                    # 5 条 E2E（自动拉起假模型 / 后端 / 前端）
+```
+
 演示模式（单进程，交付/录视频用这一条）：
 
 ```bash
@@ -212,7 +221,7 @@ java -jar server/target/panel-studio.jar  # http://localhost:8080
 | [PRD](docs/PRD.md) | 定位、用户与痛点、技术栈约束、功能需求 FR-1~FR-9（含验收标准）、状态机、风险 |
 | [架构](docs/ARCHITECTURE.md) | 分层图、回合调度时序、SSE 多路复用、JDK 17 线程模型、失败隔离、选型取舍 |
 | [数据库](docs/DATABASE.md) | SQLite 设计取舍、ER 图、7 张表字段字典、索引与 PRAGMA、Flyway 脚本 |
-| [API](docs/API.md) | 17 个接口契约、13 类主事件流 SSE 事件 + 4 类组局流事件、错误码 |
+| [API](docs/API.md) | 18 个接口契约、13 类主事件流 SSE 事件 + 4 类组局流事件、错误码 |
 | [测试](docs/TESTING.md) | 5 条 E2E + 15 条集成用例、WireMock 故障注入、验收矩阵 |
 | [计划](docs/PROJECT_PLAN.md) | 里程碑、WBS、30+ commit 切分方案 |
 | [留痕](docs/PROMPT_LOG.md) | Prompt 记录、关键决策、AI 生成 / 人工修改边界 |
