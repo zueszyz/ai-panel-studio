@@ -23,6 +23,7 @@ import com.panelstudio.infra.llm.LlmClient;
 import com.panelstudio.infra.llm.LlmException;
 import com.panelstudio.infra.llm.LlmResult;
 import com.panelstudio.infra.llm.StreamListener;
+import org.springframework.dao.DataAccessException;
 import com.panelstudio.infra.mapper.AgentRunMapper;
 import com.panelstudio.infra.mapper.MessageMapper;
 import org.slf4j.Logger;
@@ -216,6 +217,25 @@ public class AgentRunner {
                     request.quoteMessageId());
             log.warn("agent.fail discussionId={} seatId={} code={} partialChars={}",
                     discussionId, seat.getId(), ex.code(), partial.length());
+            return message;
+        } catch (DataAccessException ex) {
+            // FR-9：终态落库失败（退避重试耗尽）时不能让卡片停在 STREAMING——显式失败，
+            // 让前端提示「本条可能未保存」，用户可用同一 messageId 单条重试。
+            int latency = (int) (System.currentTimeMillis() - startedAt);
+            String partial = all.toString();
+            message.setStatus(MessageStatus.FAILED);
+            message.setContent(partial);
+            publisher.publish(discussionId, "message.failed",
+                    new MessageFailed(messageId, "DB_WRITE_FAILED", true));
+            publisher.publish(discussionId, "agent.status", new AgentStatus(seat.getId(), "failed"));
+            try {
+                recordRun(request, messageId, AgentRunPhase.FAILED, "DB_WRITE_FAILED",
+                        latency, 0, startedIso, request.quoteMessageId());
+            } catch (RuntimeException ignored) {
+                // 轨迹表同样写不进去时，静默即可：错误帧已经让卡片可见。
+            }
+            log.warn("agent.db_write_fail discussionId={} seatId={} messageId={}",
+                    discussionId, seat.getId(), messageId, ex);
             return message;
         }
     }

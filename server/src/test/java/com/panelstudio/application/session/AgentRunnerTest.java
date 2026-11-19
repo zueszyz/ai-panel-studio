@@ -38,6 +38,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class AgentRunnerTest {
 
@@ -119,6 +120,20 @@ class AgentRunnerTest {
         assertThat(healthyMessage.getStatus()).isEqualTo(MessageStatus.DONE);
         assertThat(publisher.countOf("message.failed")).isEqualTo(1);
         assertThat(publisher.failedCodes()).containsExactly("LLM_TIMEOUT");
+    }
+
+    @Test
+    @DisplayName("终态落库失败：发 DB_WRITE_FAILED 失败帧，不让卡片停在 STREAMING")
+    void shouldReportDbWriteFailure() {
+        when(messageMapper.updateById(any(MessageEntity.class)))
+                .thenThrow(new org.springframework.dao.DataRetrievalFailureException("database is locked"));
+
+        MessageEntity message = runner.run(request(seat("st_2", "周敏", AgentRoleType.ANALYST)),
+                new CancelToken());
+
+        assertThat(message.getStatus()).isEqualTo(MessageStatus.FAILED);
+        assertThat(publisher.countOf("message.failed")).isEqualTo(1);
+        assertThat(publisher.failedCodes()).containsExactly("DB_WRITE_FAILED");
     }
 
     @Test
