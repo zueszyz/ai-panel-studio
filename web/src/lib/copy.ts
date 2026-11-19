@@ -263,6 +263,7 @@ export const copy = {
     MESSAGE_NOT_FOUND: '这条发言不存在，可能已经被清理',
     MESSAGE_NOT_RETRIABLE: '用户发言不需要重试',
     AGENT_BUSY: '这位嘉宾正在发言，稍后再试',
+    DB_WRITE_FAILED: '本条可能未保存，请点这条消息上的重试',
   } as Record<string, string>,
 }
 
