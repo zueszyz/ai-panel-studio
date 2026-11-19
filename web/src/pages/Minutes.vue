@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import EmptyState from '@/components/EmptyState.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import { copy } from '@/lib/copy'
@@ -11,6 +11,7 @@ import type { MinuteSectionKey } from '@/lib/types'
 const props = defineProps<{ id: string }>()
 const store = useMinutesStore()
 const router = useRouter()
+const route = useRoute()
 
 const ORDER: MinuteSectionKey[] = ['topic', 'claims', 'disputes', 'consensus', 'hypotheses', 'nextSteps']
 
@@ -20,6 +21,16 @@ const disputes = computed(() => structured.value?.disputes ?? [])
 const consensus = computed(() => structured.value?.consensus ?? [])
 const hypotheses = computed(() => structured.value?.hypotheses ?? [])
 const nextSteps = computed(() => structured.value?.nextSteps ?? [])
+const meta = computed(() => structured.value?.meta ?? null)
+const durationLabel = computed(() => {
+  const seconds = meta.value?.durationSec ?? 0
+  if (seconds < 60) {
+    return `${seconds} 秒`
+  }
+  const minutes = Math.floor(seconds / 60)
+  const rest = seconds % 60
+  return rest > 0 ? `${minutes} 分 ${rest} 秒` : `${minutes} 分钟`
+})
 
 /** 流式到达但还没有落库版本时，直接把已到达的 Markdown 段渲染出来。 */
 const streamedSections = computed(() =>
@@ -32,7 +43,7 @@ const streamedSections = computed(() =>
 const showResult = computed(() => Boolean(store.view) || store.hasSections)
 const showEmpty = computed(() => !store.loading && !showResult.value && !store.generating)
 
-onMounted(() => void store.init(props.id))
+onMounted(() => void store.init(props.id, route.query.auto === '1'))
 onBeforeUnmount(() => store.dispose())
 
 function locate(messageId: string | undefined): void {
@@ -104,6 +115,16 @@ function onEmptyAction(): void {
             {{ store.copied ? copy.minutes.copied : copy.minutes.copy }}
           </button>
           <button
+            v-if="store.view"
+            type="button"
+            class="btn"
+            :title="copy.minutes.downloadHint"
+            data-testid="download-minutes"
+            @click="store.downloadMarkdown()"
+          >
+            {{ copy.minutes.download }}
+          </button>
+          <button
             v-if="store.canGenerate"
             type="button"
             class="btn"
@@ -156,6 +177,22 @@ function onEmptyAction(): void {
             <span class="badge badge--accent">{{ copy.minutes.versionOption(store.view.version) }}</span>
             <span class="badge badge--muted">{{ copy.minutes.generatedAt(relativeTime(store.view.createdAt)) }}</span>
           </header>
+
+          <div v-if="meta" class="minutes__facts" data-testid="minutes-facts">
+            <p class="minutes__facts-line">
+              {{ copy.minutes.facts(meta.rounds, meta.messageCount, durationLabel) }}
+            </p>
+            <p v-if="meta.participants.length" class="minutes__facts-line">
+              <span class="minutes__facts-label">{{ copy.minutes.participantsLabel }}</span>
+              {{ meta.participants.join('、') }}
+            </p>
+            <div v-if="meta.userQuestions.length" class="minutes__facts-line">
+              <span class="minutes__facts-label">{{ copy.minutes.userQuestionsLabel }}</span>
+              <ul class="minutes__questions">
+                <li v-for="question in meta.userQuestions" :key="question">{{ question }}</li>
+              </ul>
+            </div>
+          </div>
 
           <section class="block">
             <h2 class="block__title">{{ copy.minutes.sections.topic }}</h2>
@@ -350,6 +387,42 @@ function onEmptyAction(): void {
   align-items: center;
   gap: var(--space-2);
   flex-wrap: wrap;
+}
+
+/* 参会信息：不占六段结构，作为纪要的抬头事实 */
+.minutes__facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.minutes__facts-line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.minutes__facts-label {
+  flex: none;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+}
+
+.minutes__questions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding-left: var(--space-4);
+  list-style: disc;
 }
 
 .block {

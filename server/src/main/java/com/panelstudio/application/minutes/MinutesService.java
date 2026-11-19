@@ -42,6 +42,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -180,6 +182,7 @@ public class MinutesService {
                 tokens = result.tokens();
                 model = properties.getLlm().getModel();
             }
+            enrichMeta(structured, discussion, seats, messages);
 
             Map<String, AgentEntity> seatById = seats.stream()
                     .collect(Collectors.toMap(AgentEntity::getId, seat -> seat, (left, right) -> left));
@@ -367,7 +370,8 @@ public class MinutesService {
                 ? "围绕议题形成可执行判断" : discussion.getGoal());
         root.put("fallback", "LOCAL");
 
-        ArrayNode claimArray = root.putArray("claims");        Map<String, List<MessageEntity>> bySeat = new LinkedHashMap<>();
+        ArrayNode claimArray = root.putArray("claims");
+        Map<String, List<MessageEntity>> bySeat = new LinkedHashMap<>();
         for (MessageEntity message : messages) {
             if (message.getAgentId() == null || message.getRole() == MessageRole.USER) {
                 continue;
@@ -441,10 +445,54 @@ public class MinutesService {
 
     // ── Markdown 渲染与落库 ──────────────────────────────────
 
+    /**
+     * 参会信息不交给模型：时长、回合数、席位名单与用户关切都从本场数据直接算，
+     * 避免模型编造"共 5 位专家"或漏掉用户真正问过的问题。
+     */
+    private void enrichMeta(ObjectNode structured, DiscussionEntity discussion,
+                            List<AgentEntity> seats, List<MessageEntity> messages) {
+        ObjectNode meta = structured.putObject("meta");
+        int rounds = messages.stream()
+                .mapToInt(message -> message.getRoundNo() == null ? 0 : message.getRoundNo())
+                .max().orElse(0);
+        meta.put("rounds", rounds);
+        meta.put("seatCount", seats.size());
+        meta.put("messageCount", messages.size());
+        meta.put("durationSec", durationSec(discussion));
+        meta.put("generatedAt", Timestamps.now());
+        ArrayNode participants = meta.putArray("participants");
+        for (AgentEntity seat : seats) {
+            participants.add(seat.getName() + "（" + seat.getTitle() + "）");
+        }
+        ArrayNode questions = meta.putArray("userQuestions");
+        Set<String> seen = new LinkedHashSet<>();
+        for (MessageEntity message : messages) {
+            if (message.getRole() != MessageRole.USER) {
+                continue;
+            }
+            String question = shorten(message.getContent(), MAX_POINT_CHARS);
+            if (!question.isBlank() && seen.add(question) && questions.size() < 5) {
+                questions.add(question);
+            }
+        }
+    }
+
+    private int durationSec(DiscussionEntity discussion) {
+        String start = discussion.getStartedAt() == null ? discussion.getCreatedAt() : discussion.getStartedAt();
+        String end = discussion.getEndedAt() == null ? Timestamps.now() : discussion.getEndedAt();
+        if (start == null || end == null) {
+            return 0;
+        }
+        try {
+            return (int) Math.max(0, Duration.between(Instant.parse(start), Instant.parse(end)).getSeconds());
+        } catch (RuntimeException ex) {
+            return 0;
+        }
+    }
+
     private Map<String, String> renderSections(ObjectNode structured, Map<String, AgentEntity> seatById) {
         Map<String, String> sections = new LinkedHashMap<>();
-        sections.put("topic", sectionMd("topic",
-                joinNonBlank(structured.path("topic").asText(), structured.path("goal").asText())));
+        sections.put("topic", sectionMd("topic", topicBody(structured)));
 
         StringBuilder claims = new StringBuilder();
         for (JsonNode claim : structured.path("claims")) {
@@ -485,6 +533,24 @@ public class MinutesService {
         }
         sections.put("nextSteps", sectionMd("nextSteps", steps.toString().stripTrailing()));
         return sections;
+    }
+
+    private String topicBody(ObjectNode structured) {
+        StringBuilder builder = new StringBuilder(
+                joinNonBlank(structured.path("topic").asText(), structured.path("goal").asText()));
+        JsonNode meta = structured.path("meta");
+        JsonNode participants = meta.path("participants");
+        if (participants.isArray() && !participants.isEmpty()) {
+            List<String> names = new ArrayList<>();
+            participants.forEach(node -> names.add(node.asText()));
+            builder.append("\n\n**参会席位**：").append(String.join("、", names));
+        }
+        JsonNode questions = meta.path("userQuestions");
+        if (questions.isArray() && !questions.isEmpty()) {
+            builder.append("\n\n**用户关切**");
+            questions.forEach(node -> builder.append("\n- ").append(node.asText()));
+        }
+        return builder.toString();
     }
 
     private String sectionMd(String key, String body) {
@@ -592,7 +658,9 @@ public class MinutesService {
                 break;
             }
             AgentEntity seat = message.getAgentId() == null ? null : seatById.get(message.getAgentId());
-            String speaker = seat == null ? "旁听者" : seat.getName() + "（" + seat.getTitle() + "）";
+            String speaker = seat == null
+                    ? (message.getRole() == MessageRole.USER ? "你（参与者）" : "旁听者")
+                    : seat.getName() + "（" + seat.getTitle() + "）";
             builder.append('[').append(message.getId()).append("] 第 ")
                     .append(message.getRoundNo() == null ? 0 : message.getRoundNo())
                     .append(" 回合 ").append(speaker).append("：")

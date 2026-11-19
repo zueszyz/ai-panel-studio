@@ -36,7 +36,10 @@ export const useMinutesStore = defineStore('minutes', () => {
   const hasSections = computed(() => Object.keys(sections.value).length > 0)
   const versions = computed(() => view.value?.versions ?? [])
 
-  async function init(id: string): Promise<void> {
+  /**
+   * @param auto 结束讨论后跳转过来（?auto=1）：没有纪要就自动生成，省掉再点一次「生成纪要」。
+   */
+  async function init(id: string, auto = false): Promise<void> {
     discussionId.value = id
     loading.value = true
     error.value = null
@@ -53,6 +56,9 @@ export const useMinutesStore = defineStore('minutes', () => {
     }
     await loadMinutes()
     loading.value = false
+    if (auto && notFound.value && canGenerate.value) {
+      await generate()
+    }
   }
 
   async function loadMinutes(version?: number): Promise<void> {
@@ -142,6 +148,21 @@ export const useMinutesStore = defineStore('minutes', () => {
     }
   }
 
+  /** 导出为 .md：离线归档或贴进文档时不必再手动复制。 */
+  function downloadMarkdown(): void {
+    const markdown = view.value?.contentMd
+    if (!markdown) {
+      return
+    }
+    const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `圆桌纪要-${topic.value.slice(0, 20) || '未命名'}.md`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   function dispose(): void {
     controller?.abort()
     controller = null
@@ -169,6 +190,7 @@ export const useMinutesStore = defineStore('minutes', () => {
     selectVersion,
     generate,
     copyMarkdown,
+    downloadMarkdown,
     dispose,
   }
 })

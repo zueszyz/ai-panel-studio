@@ -155,6 +155,10 @@ async function submit(): Promise<void> {
 async function confirmEnd(): Promise<void> {
   endDialogOpen.value = false
   await store.end()
+  // 结束后直接去纪要页并自动生成，省掉「结束 → 再点生成纪要」这一步；失败时留在现场看提示。
+  if (store.status === 'SUMMARIZING') {
+    await router.push(`/discussions/${props.id}/minutes?auto=1`)
+  }
 }
 
 function goMinutes(): void {
