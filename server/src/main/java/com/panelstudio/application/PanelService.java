@@ -1,5 +1,6 @@
 package com.panelstudio.application;
 
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.panelstudio.api.advice.ApiException;
 import com.panelstudio.api.dto.DiscussionDtos.ClaimResponse;
 import com.panelstudio.api.dto.DiscussionDtos.CreatePanelRequest;
@@ -311,11 +312,14 @@ public class PanelService {
         participantMapper.deleteById(mine.getId());
     }
 
+    /**
+     * 只改状态：不能用 updateById(patch) —— patch 的 focus 是空 List 而非 null，
+     * MyBatis-Plus 会把它当成「要更新的字段」写回 '[]'，认领/撤销就会把关注点冲掉。
+     */
     private void updateSeatStatus(AgentEntity seat, AgentStatus status) {
-        AgentEntity patch = new AgentEntity();
-        patch.setId(seat.getId());
-        patch.setStatus(status);
-        agentMapper.updateById(patch);
+        agentMapper.update(null, Wrappers.<AgentEntity>lambdaUpdate()
+                .eq(AgentEntity::getId, seat.getId())
+                .set(AgentEntity::getStatus, status));
     }
 
     // ── 事件与映射 ─────────────────────────────────────────

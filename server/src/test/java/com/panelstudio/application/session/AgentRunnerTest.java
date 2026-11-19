@@ -78,7 +78,7 @@ class AgentRunnerTest {
     private AgentRunner.RunRequest request(AgentEntity seat) {
         return new AgentRunner.RunRequest("dk_1", "要不要换向量召回", "判断该不该迁移", seat, null,
                 1, MessageKind.SPEECH, AgentRunTrigger.ROUND_START, null, null, null,
-                List.of(), Map.of(seat.getId(), seat.getName()), false, false);
+                List.of(), Map.of(seat.getId(), seat.getName()), false, false, false);
     }
 
     @Test

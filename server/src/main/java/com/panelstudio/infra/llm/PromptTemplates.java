@@ -100,6 +100,44 @@ public final class PromptTemplates {
                 goal == null || goal.isBlank() ? topic : goal);
     }
 
+    // ── 收敛（M4） ──────────────────────────────────────────
+
+    /** 纪要主笔：强制六段结构，且要点必须带可溯源的消息 id。 */
+    public static String minutesSystem() {
+        return """
+                你是这场圆桌会议的主笔。你的任务是把讨论整理成可复盘的会议纪要。
+                只输出 JSON，不要解释、不要 markdown 代码围栏。结构：
+                {"topic":"议题","goal":"本场要回答的问题",
+                 "claims":[{"seatId":"st_x","name":"姓名","points":["要点1","要点2"],"sourceMessageIds":["ms_x"]}],
+                 "disputes":[{"question":"分歧内容","sideA":{"seats":["st_x"],"argument":"A 方论据","sources":["ms_x"]},
+                              "sideB":{"seats":["st_y"],"argument":"B 方论据","sources":["ms_y"]},
+                              "unresolvedBecause":"当前未决原因"}],
+                 "consensus":["已达成的共识"],
+                 "hypotheses":["若……则……"],
+                 "nextSteps":[{"action":"下一步动作","proposedBy":"提出者姓名"}]}
+                规则：
+                1. claims 覆盖每位发过言的专家，每人 2 到 4 条，每条不超过 40 字；
+                2. disputes 至少 1 组，必须写出双方论据，不能只写"存在分歧"；
+                3. consensus 只写真正达成一致的内容，没有就留空数组；
+                4. hypotheses 必须可检验，带判断条件与阈值；
+                5. sourceMessageIds 与 sources 只能取自上下文中出现过的消息 id，禁止编造；
+                6. nextSteps 1 到 3 条，proposedBy 必须是本场出现过的姓名。
+                """;
+    }
+
+    public static String minutesUser(String topic, String goal, String seatDigest, String transcript) {
+        return """
+                议题：%s
+                本场目标：%s
+                席位：
+                %s
+                讨论记录（格式：[消息 id] 第 N 回合 姓名（岗位）：内容）：
+                %s
+                请按六段结构整理纪要。
+                """.formatted(topic, goal == null || goal.isBlank() ? "围绕议题形成可执行判断" : goal,
+                seatDigest, transcript);
+    }
+
     public static String seatRepairUser(String topic, int seatIndex, String errors) {
         return """
                 上一次输出不符合要求：%s

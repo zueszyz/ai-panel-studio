@@ -187,6 +187,42 @@ class PanelApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("认领与撤销都不清空席位关注点（focus JSON 列写回可读）")
+    void shouldKeepFocusAcrossClaimAndRevoke() throws Exception {
+        String discussionId = createDiscussion();
+        generatePanel(discussionId, false, true);
+
+        JsonNode seats = readSeats(discussionId);
+        String seatId = seats.get(1).get("id").asText();
+        JsonNode focus = seats.get(1).get("focus");
+        assertThat(focus.isArray()).isTrue();
+        assertThat(focus.size()).isGreaterThan(0);
+
+        mockMvc.perform(post("/api/discussions/" + discussionId + "/claim")
+                        .header("X-Device-Id", DEVICE_A)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("seatId", seatId))))
+                .andExpect(status().isOk());
+        assertThat(readSeats(discussionId).get(1).get("focus")).isEqualTo(focus);
+
+        mockMvc.perform(post("/api/discussions/" + discussionId + "/claim")
+                        .header("X-Device-Id", DEVICE_A)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"seatId\":null}"))
+                .andExpect(status().isOk());
+        assertThat(readSeats(discussionId).get(1).get("focus")).isEqualTo(focus);
+    }
+
+    private JsonNode readSeats(String discussionId) throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/discussions/" + discussionId + "/panel")
+                        .header("X-Device-Id", DEVICE_A))
+                .andExpect(status().isOk())
+                .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                .get("seats");
+    }
+
+    @Test
     @DisplayName("认领主持人席位 → 409 SEAT_NOT_CLAIMABLE；不存在的席位 → 404")
     void shouldRejectHostAndUnknownSeat() throws Exception {
         String discussionId = createDiscussion();

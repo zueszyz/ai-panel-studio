@@ -1,7 +1,7 @@
 package com.panelstudio.application.session;
 
-import com.panelstudio.api.dto.StreamEvents.AgentStatus;
-import com.panelstudio.api.dto.StreamEvents.MessageDelta;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.panelstudio.api.dto.StreamEvents.AgentStatus;import com.panelstudio.api.dto.StreamEvents.MessageDelta;
 import com.panelstudio.api.dto.StreamEvents.MessageEnd;
 import com.panelstudio.api.dto.StreamEvents.MessageFailed;
 import com.panelstudio.api.dto.StreamEvents.MessageStart;
@@ -76,6 +76,7 @@ public class AgentRunner {
 
     /**
      * @param messageId 可预分配（/start 需要在生成前就返回 openingMessageId），为空时内部生成
+     * @param retry     单条重试：沿用同一 messageId 更新已有行，而不是再插一条
      */
     public record RunRequest(String discussionId,
                              String topic,
@@ -91,7 +92,8 @@ public class AgentRunner {
                              List<MessageEntity> history,
                              Map<String, String> seatNames,
                              boolean opening,
-                             boolean digest) {
+                             boolean digest,
+                             boolean retry) {
     }
 
     /**
@@ -122,7 +124,17 @@ public class AgentRunner {
         message.setTokensOut(0);
         message.setAttempt(1);
         message.setClientMsgId("run-" + messageId);
-        messageMapper.insert(message);
+        if (request.retry()) {
+            // 重试不新增行：把同一张卡片改回 STREAMING，attempt+1（前端凭 messageId 原位刷新）
+            messageMapper.update(null, Wrappers.<MessageEntity>lambdaUpdate()
+                    .eq(MessageEntity::getId, messageId)
+                    .set(MessageEntity::getStatus, MessageStatus.STREAMING)
+                    .set(MessageEntity::getContent, "")
+                    .setSql("attempt = attempt + 1")
+                    .set(MessageEntity::getUpdatedAt, Timestamps.now()));
+        } else {
+            messageMapper.insert(message);
+        }
 
         String discussionId = request.discussionId();
         publisher.publish(discussionId, "agent.status", new AgentStatus(seat.getId(), "thinking"));

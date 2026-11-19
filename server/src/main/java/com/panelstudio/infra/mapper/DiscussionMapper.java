@@ -5,6 +5,7 @@ import com.panelstudio.domain.entity.DiscussionEntity;
 import com.panelstudio.domain.enums.DiscussionStatus;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.ResultMap;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
@@ -41,6 +42,7 @@ public interface DiscussionMapper extends BaseMapper<DiscussionEntity> {
             LIMIT #{limit} OFFSET #{offset}
             </script>
             """)
+    @ResultMap("mybatis-plus_DiscussionEntity")
     List<DiscussionEntity> search(@Param("statuses") List<DiscussionStatus> statuses,
                                   @Param("keyword") String keyword,
                                   @Param("ids") List<String> ids,

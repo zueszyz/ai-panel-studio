@@ -129,7 +129,7 @@ public final class SessionActor {
         String messageId = idGenerator.nextWithPrefix(IdPrefixes.MESSAGE);
         enqueue(() -> {
             runSeat(host, messageId, 0, MessageKind.OPENING, AgentRunTrigger.ROUND_START,
-                    null, null, true, false, new CancelToken());
+                    null, null, true, false, false, new CancelToken());
             if (isLive()) {
                 List<String> speakers = pickSpeakers(null, null);
                 enqueue(() -> runTurn(speakers, reasonOf(null, null), null, null));
@@ -235,7 +235,7 @@ public final class SessionActor {
                 return;
             }
             runSeat(seat, null, round, MessageKind.SPEECH,
-                    triggerOf(user, quotedSeatId), user, quotedSeatId, false, false, token);
+                    triggerOf(user, quotedSeatId), user, quotedSeatId, false, false, false, token);
         } finally {
             if (globalAcquired) {
                 globalSemaphore.release();
@@ -264,11 +264,12 @@ public final class SessionActor {
         CancelToken token = new CancelToken();
         inflight.put(host.getId(), token);
         try {
+            // 收束消息的 id 必须与 digest.start 一致，否则前端点轨迹定位不到这条消息
+            String messageId = idGenerator.nextWithPrefix(IdPrefixes.MESSAGE);
             publisher.publish(discussionId, "digest.start",
-                    new com.panelstudio.api.dto.StreamEvents.DigestStart(
-                            idGenerator.nextWithPrefix(IdPrefixes.MESSAGE)));
-            runSeat(host, null, round, MessageKind.DIGEST, AgentRunTrigger.DIGEST,
-                    null, null, false, true, token);
+                    new com.panelstudio.api.dto.StreamEvents.DigestStart(messageId));
+            runSeat(host, messageId, round, MessageKind.DIGEST, AgentRunTrigger.DIGEST,
+                    null, null, false, true, false, token);
         } finally {
             inflight.remove(host.getId(), token);
         }
@@ -276,18 +277,49 @@ public final class SessionActor {
 
     private void runSeat(AgentEntity seat, String messageId, int round, MessageKind kind,
                          AgentRunTrigger trigger, MessageEntity user, String quotedSeatId,
-                         boolean opening, boolean digest, CancelToken token) {
+                         boolean opening, boolean digest, boolean retry, CancelToken token) {
         String quoteContent = quotedSeatId == null ? null : contentOf(quotedSeatId);
         MessageEntity produced = agentRunner.run(new AgentRunner.RunRequest(
                 discussionId, topic, goal, seat, messageId, round, kind, trigger, user,
                 quotedSeatId, quoteContent, snapshotHistory(), new LinkedHashMap<>(seatNames),
-                opening, digest), token);
+                opening, digest, retry), token);
         budget.consume(produced.getTokensOut() == null ? 0 : produced.getTokensOut());
         remember(produced);
         if (!budget.canSpeak()) {
             publisher.publish(discussionId, "error",
                     new ErrorFrame("BUDGET_EXHAUSTED", "本场 token 预算已用完，请结束讨论并生成纪要", false));
         }
+    }
+
+    /**
+     * 单条重试（PRD FR-9）：沿用同一 messageId，前端卡片原位回到 STREAMING。
+     * 同一席位正在发言时不排队，直接返回 false 让调用方回 409。
+     *
+     * @param target 由仓储层按 id 读出的原消息（不用内存 history，避免老消息被裁掉后重试不了）
+     */
+    public boolean retryMessage(MessageEntity target) {
+        if (!isLive() || target == null || target.getAgentId() == null) {
+            return false;
+        }
+        AgentEntity seat = seatById.get(target.getAgentId());
+        if (seat == null) {
+            return false;
+        }
+        CancelToken token = new CancelToken();
+        if (inflight.putIfAbsent(seat.getId(), token) != null) {
+            return false;
+        }
+        enqueue(() -> {
+            try {
+                runSeat(seat, target.getId(), target.getRoundNo() == null ? 0 : target.getRoundNo(),
+                        target.getKind(), AgentRunTrigger.ROUND_START, null, target.getQuoteMessageId(),
+                        target.getKind() == MessageKind.OPENING, target.getKind() == MessageKind.DIGEST,
+                        true, token);
+            } finally {
+                inflight.remove(seat.getId(), token);
+            }
+        });
+        return true;
     }
 
     // ── 策略与工具 ──────────────────────────────────────────
@@ -351,6 +383,13 @@ public final class SessionActor {
 
     private void remember(MessageEntity message) {
         synchronized (history) {
+            // 重试会产出同一个 id 的新内容：替换而不是追加，否则历史里会出现两条同 id 消息
+            for (int index = 0; index < history.size(); index++) {
+                if (history.get(index).getId().equals(message.getId())) {
+                    history.set(index, message);
+                    return;
+                }
+            }
             history.add(message);
             while (history.size() > HISTORY_LIMIT) {
                 history.remove(0);
