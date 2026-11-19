@@ -152,7 +152,7 @@ WireMock 令 `st_3` 超时（`withFixedDelay(60000)`）。断言：该卡片「�
 ## 6. 执行方式
 
 ```bash
-# 后端：单元 + 集成（Flyway 建临时库，WireMock 内嵌，72 例）
+# 后端：单元 + 集成（Flyway 建临时库，WireMock 内嵌，74 例）
 mvn -f server/pom.xml test
 
 # 前端：vue-tsc 类型检查 + 构建（Vitest 未接入，前端行为由 E2E 覆盖）
@@ -174,7 +174,7 @@ pnpm -C e2e test
 
 ## 7. 交付前自检（打包前必跑）
 
-- [ ] `mvn -f server/pom.xml test` 全绿（单元 + 集成 72 条，含 SQLite 并发写）
+- [ ] `mvn -f server/pom.xml test` 全绿（单元 + 集成 74 条，含 SQLite 并发写）
 - [ ] `pnpm -C e2e test` 全绿（5 条，约 35s）
 - [ ] 删除 `data/panel-studio.db` 后重启，Flyway 三个脚本自动建库并 seed 成功（证明"数据库初始化脚本"可交付）
 - [ ] `/swagger-ui.html` 可访问，接口数量与 [API](API.md) §1 一致（19 个）
