@@ -2,6 +2,7 @@ package com.panelstudio.api;
 
 import com.panelstudio.api.dto.DiscussionDtos.CreateDiscussionRequest;
 import com.panelstudio.api.dto.DiscussionDtos.CreateDiscussionResponse;
+import com.panelstudio.api.dto.DiscussionDtos.DeleteDiscussionResponse;
 import com.panelstudio.api.dto.DiscussionDtos.DiscussionDetail;
 import com.panelstudio.api.dto.DiscussionDtos.DiscussionListResponse;
 import com.panelstudio.application.DiscussionService;
@@ -9,6 +10,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -58,5 +60,13 @@ public class DiscussionController {
             @RequestHeader(value = "X-Device-Id", required = false) String deviceId,
             @PathVariable("id") String id) {
         return discussionService.detail(id, deviceId);
+    }
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "软删除圆桌（仅创建者）")
+    public DeleteDiscussionResponse delete(
+            @RequestHeader(value = "X-Device-Id", required = false) String deviceId,
+            @PathVariable("id") String id) {
+        return discussionService.delete(id, deviceId);
     }
 }

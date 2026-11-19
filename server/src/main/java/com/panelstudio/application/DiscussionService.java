@@ -3,6 +3,7 @@ package com.panelstudio.application;
 import com.panelstudio.api.advice.ApiException;
 import com.panelstudio.api.dto.DiscussionDtos.CreateDiscussionRequest;
 import com.panelstudio.api.dto.DiscussionDtos.CreateDiscussionResponse;
+import com.panelstudio.api.dto.DiscussionDtos.DeleteDiscussionResponse;
 import com.panelstudio.api.dto.DiscussionDtos.DiscussionDetail;
 import com.panelstudio.api.dto.DiscussionDtos.DiscussionListResponse;
 import com.panelstudio.api.dto.DiscussionDtos.DiscussionSummary;
@@ -10,6 +11,7 @@ import com.panelstudio.api.dto.DiscussionDtos.LastMessageView;
 import com.panelstudio.api.dto.DiscussionDtos.PanelQueryResponse;
 import com.panelstudio.api.dto.DiscussionDtos.SeatBrief;
 import com.panelstudio.api.dto.DiscussionDtos.SeatView;
+import com.panelstudio.application.session.SessionActorRegistry;
 import com.panelstudio.domain.entity.AgentEntity;
 import com.panelstudio.domain.entity.DiscussionEntity;
 import com.panelstudio.domain.entity.MessageEntity;
@@ -21,6 +23,7 @@ import com.panelstudio.infra.mapper.AgentMapper;
 import com.panelstudio.infra.mapper.DiscussionMapper;
 import com.panelstudio.infra.mapper.MessageMapper;
 import com.panelstudio.infra.mapper.ParticipantMapper;
+import com.panelstudio.infra.sse.SseRegistry;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,19 +55,25 @@ public class DiscussionService {
     private final ParticipantMapper participantMapper;
     private final UserService userService;
     private final UlidGenerator idGenerator;
+    private final SessionActorRegistry actorRegistry;
+    private final SseRegistry sseRegistry;
 
     public DiscussionService(DiscussionMapper discussionMapper,
                              AgentMapper agentMapper,
                              MessageMapper messageMapper,
                              ParticipantMapper participantMapper,
                              UserService userService,
-                             UlidGenerator idGenerator) {
+                             UlidGenerator idGenerator,
+                             SessionActorRegistry actorRegistry,
+                             SseRegistry sseRegistry) {
         this.discussionMapper = discussionMapper;
         this.agentMapper = agentMapper;
         this.messageMapper = messageMapper;
         this.participantMapper = participantMapper;
         this.userService = userService;
         this.idGenerator = idGenerator;
+        this.actorRegistry = actorRegistry;
+        this.sseRegistry = sseRegistry;
     }
 
     @Transactional
@@ -129,7 +138,7 @@ public class DiscussionService {
                     preview(latest.getContent()),
                     speakerName(latest, agentsById),
                     latest.getCreatedAt());
-            items.add(new DiscussionSummary(row.getId(), row.getTopic(), row.getStatus(),
+            items.add(new DiscussionSummary(row.getId(), row.getTopic(), isCreator(row, userId), row.getStatus(),
                     row.getPanelSize(), row.getTurnIndex(), seatBriefs, lastMessage, row.getUpdatedAt()));
         }
         String nextCursor = hasMore ? CursorCodec.encode(offset + pageSize) : null;
@@ -142,10 +151,35 @@ public class DiscussionService {
         return toDetail(discussion, userId);
     }
 
+    /**
+     * 软删除：只写 deleted_at，并停掉该场内存调度与 SSE。
+     * 已删除的行对 @TableLogic 不可见，所以先用原始查询区分「不存在」与「已删除」。
+     */
+    @Transactional
+    public DeleteDiscussionResponse delete(String discussionId, String deviceId) {
+        DiscussionEntity discussion = discussionMapper.selectById(discussionId);
+        String userId = userService.resolveUserId(deviceId);
+        if (discussion == null) {
+            if (discussionMapper.selectAnyById(discussionId) != null) {
+                throw new ApiException(HttpStatus.GONE, "DISCUSSION_DELETED", "这场圆桌已被删除");
+            }
+            throw new ApiException(HttpStatus.NOT_FOUND, "DISCUSSION_NOT_FOUND", "这场圆桌不存在");
+        }
+        if (userId == null || !userId.equals(discussion.getCreatedBy())) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "只有创建者可以删除这场圆桌");
+        }
+        discussionMapper.deleteById(discussionId);
+        // 删除后不再产生新消息：停调度、关连接（FR-8）
+        actorRegistry.remove(discussionId);
+        sseRegistry.closeAll(discussionId);
+        return new DeleteDiscussionResponse(discussionId, true);
+    }
+
     public DiscussionDetail toDetail(DiscussionEntity discussion, String userId) {
         List<SeatView> seats = seatViews(discussion.getId(), userId);
         String mySeatId = mySeatMap(userId, List.of(discussion.getId())).get(discussion.getId());
-        return new DiscussionDetail(discussion.getId(), discussion.getTopic(), discussion.getGoal(),
+        return new DiscussionDetail(discussion.getId(), discussion.getTopic(), isCreator(discussion, userId),
+                discussion.getGoal(),
                 discussion.getStatus(), discussion.getPanelSize(), discussion.getTurnIndex(), seats,
                 discussion.getTopicAnalysis(), mySeatId, discussion.getCreatedAt(), discussion.getUpdatedAt());
     }
@@ -169,9 +203,16 @@ public class DiscussionService {
     public DiscussionEntity requireDiscussion(String discussionId) {
         DiscussionEntity discussion = discussionMapper.selectById(discussionId);
         if (discussion == null) {
+            if (discussionMapper.selectAnyById(discussionId) != null) {
+                throw new ApiException(HttpStatus.GONE, "DISCUSSION_DELETED", "这场圆桌已被删除");
+            }
             throw new ApiException(HttpStatus.NOT_FOUND, "DISCUSSION_NOT_FOUND", "这场圆桌不存在");
         }
         return discussion;
+    }
+
+    private static boolean isCreator(DiscussionEntity discussion, String userId) {
+        return userId != null && userId.equals(discussion.getCreatedBy());
     }
 
     private Map<String, String> mySeatMap(String userId, List<String> discussionIds) {

@@ -15,6 +15,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -157,5 +158,41 @@ class DiscussionApiIntegrationTest {
         mockMvc.perform(get("/api/discussions/dk_not_exists"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("DISCUSSION_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("软删除：仅创建者可删；列表移除、直链 410、重复删除 410")
+    void shouldSoftDeleteOnlyAsCreator() throws Exception {
+        MvcResult created = mockMvc.perform(post("/api/discussions")
+                        .header("X-Device-Id", DEVICE_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "topic", "我们该不该把推荐系统从规则引擎换成向量召回",
+                                "panelSize", 4))))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String id = objectMapper.readTree(created.getResponse().getContentAsString()).get("id").asText();
+
+        mockMvc.perform(delete("/api/discussions/" + id).header("X-Device-Id", "another-device"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+        mockMvc.perform(delete("/api/discussions/" + id))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("FORBIDDEN"));
+
+        mockMvc.perform(delete("/api/discussions/" + id).header("X-Device-Id", DEVICE_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id))
+                .andExpect(jsonPath("$.deleted").value(true));
+
+        mockMvc.perform(get("/api/discussions/" + id))
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.error.code").value("DISCUSSION_DELETED"));
+        mockMvc.perform(delete("/api/discussions/" + id).header("X-Device-Id", DEVICE_ID))
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.error.code").value("DISCUSSION_DELETED"));
+        mockMvc.perform(get("/api/discussions").param("limit", "50"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[?(@.id == '" + id + "')]").isEmpty());
     }
 }

@@ -14,6 +14,11 @@ import java.util.List;
 @Mapper
 public interface DiscussionMapper extends BaseMapper<DiscussionEntity> {
 
+    /** 含软删除行的原始查询：用于区分「不存在」与「已删除」（@TableLogic 默认会过滤）。 */
+    @Select("SELECT * FROM discussions WHERE id = #{id}")
+    @ResultMap("mybatis-plus_DiscussionEntity")
+    DiscussionEntity selectAnyById(@Param("id") String id);
+
     /**
      * 大厅列表：LIVE 优先，再按 updated_at 倒序。
      * 只做「限量查询」，offset 由游标（不透明）传入，避免全表拉取后在内存分页。

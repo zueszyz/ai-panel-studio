@@ -47,9 +47,13 @@ public final class DiscussionDtos {
     public record LastMessageView(String preview, String speaker, String at) {
     }
 
+    public record DeleteDiscussionResponse(String id, boolean deleted) {
+    }
+
     public record DiscussionSummary(
             String id,
             String topic,
+            boolean createdByMe,
             DiscussionStatus status,
             int panelSize,
             int turnIndex,
@@ -78,6 +82,7 @@ public final class DiscussionDtos {
     public record DiscussionDetail(
             String id,
             String topic,
+            boolean createdByMe,
             String goal,
             DiscussionStatus status,
             int panelSize,
