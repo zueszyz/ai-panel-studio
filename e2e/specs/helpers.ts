@@ -90,9 +90,11 @@ export async function prepareEndedDiscussion(request: APIRequestContext): Promis
 export async function waitForRunsSettled(
   request: APIRequestContext,
   id: string,
-  options: { minUserReply?: number; timeoutMs?: number } = {},
+  options: { minUserReply?: number; minRuns?: number; timeoutMs?: number } = {},
 ): Promise<void> {
-  const { minUserReply = 1, timeoutMs = 40_000 } = options
+  // minRuns 必须为 1：agent_runs 在每次发言结束时才写，空表不能当成「已收尾」，
+  // 否则紧跟着发插话时上一轮还在 inflight，插话会被「席位已在发言」跳过。
+  const { minUserReply = 1, minRuns = 1, timeoutMs = 40_000 } = options
   const deadline = Date.now() + timeoutMs
   let stable = 0
   let lastSignature = ''
@@ -108,7 +110,7 @@ export async function waitForRunsSettled(
     const signature = `${body.items.length}:${replies}`
     stable = signature === lastSignature ? stable + 1 : 0
     lastSignature = signature
-    if (!busy && replies >= minUserReply && stable >= 1) {
+    if (body.items.length >= minRuns && !busy && replies >= minUserReply && stable >= 1) {
       return
     }
     await new Promise((done) => setTimeout(done, 300))
