@@ -176,7 +176,8 @@ class PanelLlmIntegrationTest {
         long deadline = System.currentTimeMillis() + 15_000;
         while (System.currentTimeMillis() < deadline) {
             body = streamed.getResponse().getContentAsString(StandardCharsets.UTF_8);
-            if (body.contains("event:panel.failed")) {
+            // 事件名与 data 帧分两次写入：必须等到错误码落盘，否则会读到半帧。
+            if (body.contains("event:panel.failed") && body.contains("LLM_UPSTREAM_ERROR")) {
                 break;
             }
             Thread.sleep(30);
