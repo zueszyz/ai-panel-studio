@@ -15,7 +15,7 @@
 | 层 | 工具 | 覆盖对象 | 目标 |
 | --- | --- | --- | --- |
 | 单元 | JUnit 5 + AssertJ + Mockito | `SpeakerPolicy`、`ContextBuilder`、`DiscussionStateMachine`、JSON 修复器、ULID 生成器 | 策略可解释、边界明确、无 IO |
-| 集成 | `@SpringBootTest` + MockMvc + 临时 SQLite（每类一个临时文件）+ WireMock | 18 个接口的状态码、幂等、事务、SSE 帧序列 | 契约不被破坏 |
+| 集成 | `@SpringBootTest` + MockMvc + 临时 SQLite（每类一个临时文件）+ WireMock | 19 个接口的状态码、幂等、事务、SSE 帧序列 | 契约不被破坏 |
 | E2E | Playwright（Node）+ `e2e/mock-llm.mjs` | 真实浏览器 + 真实前后端（`spring-boot:run`）+ OpenAI 兼容假模型 | 5 条主链路全绿，`pnpm -C e2e test` 一条命令跑完 |
 | 前端单测 | Vitest（可选） | SSE 解析器（跨 chunk 截断）、store 去重逻辑 | 流式解析不出错 |
 
@@ -152,7 +152,7 @@ WireMock 令 `st_3` 超时（`withFixedDelay(60000)`）。断言：该卡片「�
 ## 6. 执行方式
 
 ```bash
-# 后端：单元 + 集成（Flyway 建临时库，WireMock 内嵌，57 例）
+# 后端：单元 + 集成（Flyway 建临时库，WireMock 内嵌，65 例）
 mvn -f server/pom.xml test
 
 # 前端：vue-tsc 类型检查 + 构建（Vitest 未接入，前端行为由 E2E 覆盖）
@@ -177,7 +177,7 @@ pnpm -C e2e test
 - [ ] `mvn -f server/pom.xml test` 全绿（单元 + 集成 57 条，含 SQLite 并发写）
 - [ ] `pnpm -C e2e test` 全绿（5 条，约 35s）
 - [ ] 删除 `data/panel-studio.db` 后重启，Flyway 三个脚本自动建库并 seed 成功（证明"数据库初始化脚本"可交付）
-- [ ] `/swagger-ui.html` 可访问，接口数量与 [API](API.md) §1 一致（18 个）
+- [ ] `/swagger-ui.html` 可访问，接口数量与 [API](API.md) §1 一致（19 个）
 - [ ] `git log --oneline | wc -l` ≥ 30，且 `docs/git-history.txt` 已导出
 - [ ] 压缩包不包含 `node_modules/`、`server/target/`、`data/`
 - [ ] 录屏用的场景 = E2E-2（两路并行流式），确保视频里能看到"不阻塞"

@@ -175,7 +175,7 @@ ai-panel-studio/
 ```
 
 > 当前进度：**M1 骨架 + M2（大厅 / 组局）+ M3（讨论内核）+ M4（纪要收敛）+ M5（质量）已落地**。
-> 后端 `mvn test` 57 例全绿；前端 `pnpm build` 通过；`pnpm -C e2e test` 5 条 E2E 全绿（约 35s，假模型驱动，不需要 API Key）。
+> 后端 `mvn test` 65 例全绿；前端 `pnpm build` 通过；`pnpm -C e2e test` 5 条 E2E 全绿（约 35s，假模型驱动，不需要 API Key）。
 
 ## 5. 快速开始
 
@@ -200,7 +200,7 @@ pnpm -C web install && pnpm -C web dev    # http://localhost:5173
 跑测试（三件套，都不需要容器与真实模型）：
 
 ```bash
-mvn -f server/pom.xml test          # 单元 + 集成 57 例
+mvn -f server/pom.xml test          # 单元 + 集成 65 例
 pnpm -C web build                   # vue-tsc 类型检查 + 构建
 pnpm -C e2e test                    # 5 条 E2E（自动拉起假模型 / 后端 / 前端）
 ```
@@ -221,7 +221,7 @@ java -jar server/target/panel-studio.jar  # http://localhost:8080
 | [PRD](docs/PRD.md) | 定位、用户与痛点、技术栈约束、功能需求 FR-1~FR-9（含验收标准）、状态机、风险 |
 | [架构](docs/ARCHITECTURE.md) | 分层图、回合调度时序、SSE 多路复用、JDK 17 线程模型、失败隔离、选型取舍 |
 | [数据库](docs/DATABASE.md) | SQLite 设计取舍、ER 图、7 张表字段字典、索引与 PRAGMA、Flyway 脚本 |
-| [API](docs/API.md) | 18 个接口契约、13 类主事件流 SSE 事件 + 4 类组局流事件、错误码 |
+| [API](docs/API.md) | 19 个接口契约、13 类主事件流 SSE 事件 + 4 类组局流事件、错误码 |
 | [测试](docs/TESTING.md) | 5 条 E2E + 15 条集成用例、WireMock 故障注入、验收矩阵 |
 | [计划](docs/PROJECT_PLAN.md) | 里程碑、WBS、30+ commit 切分方案 |
 | [留痕](docs/PROMPT_LOG.md) | Prompt 记录、关键决策、AI 生成 / 人工修改边界 |
