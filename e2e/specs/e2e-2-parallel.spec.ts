@@ -24,6 +24,9 @@ test.describe('E2E-2 并行流式', () => {
 
     // 开场会自动触发第 1 回合：先等这一轮收尾，否则"谁在流式"会混进自动回合的发言
     await waitForRunsSettled(request, id, { minUserReply: 0 })
+    // agent_runs 只在发言结束时写入，看不到 inflight 的发言；用页面上的 STREAMING 卡片判断是否真正空闲。
+    await expect(page.locator('[data-testid="message-bubble"][data-status="STREAMING"]'))
+      .toHaveCount(0, { timeout: 20_000 })
     const before = await page.locator('[data-testid="message-bubble"]').count()
 
     // 同时点名两位专家，确保两人都被选中
