@@ -1,3 +1,8 @@
+76a4216 2026-11-19 docs: log interrupt deadline and flaky test fixes
+9c72bd3 2026-11-19 test(server): register retry fault stub after the auto-started round
+9468e59 2026-11-19 test(e2e): wait for streaming cards to clear before interrupting
+84372ac 2026-11-19 fix(server): wait up to 30s for busy responders on an interrupt
+c8088c9 2026-11-19 docs: refresh git history export after preset/SSE fixes
 c253d0a 2026-11-19 docs: sort audit findings by id in PROMPT_LOG
 779e476 2026-11-19 docs: sync 74-test counts and log preset/SSE fixes
 e90c03a 2026-11-19 fix(web): scope preset fallback wording in remaining error copy
