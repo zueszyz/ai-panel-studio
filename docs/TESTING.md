@@ -152,7 +152,7 @@ WireMock 令 `st_3` 超时（`withFixedDelay(60000)`）。断言：该卡片「�
 ## 6. 执行方式
 
 ```bash
-# 后端：单元 + 集成（Flyway 建临时库，WireMock 内嵌，65 例）
+# 后端：单元 + 集成（Flyway 建临时库，WireMock 内嵌，66 例）
 mvn -f server/pom.xml test
 
 # 前端：vue-tsc 类型检查 + 构建（Vitest 未接入，前端行为由 E2E 覆盖）
