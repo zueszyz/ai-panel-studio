@@ -7,7 +7,9 @@ import MessageBubble from '@/components/MessageBubble.vue'
 import SeatRail from '@/components/SeatRail.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import TracePanel from '@/components/TracePanel.vue'
+import { ApiError } from '@/lib/api'
 import { copy } from '@/lib/copy'
+import { restartDiscussion } from '@/lib/discussions'
 import { useLiveStore } from '@/stores/live'
 
 const props = defineProps<{ id: string }>()
@@ -22,6 +24,8 @@ const newCount = ref(0)
 const highlightId = ref<string | null>(null)
 const endDialogOpen = ref(false)
 const traceOpen = ref(false)
+const restarting = ref(false)
+const restartError = ref<string | null>(null)
 const submitting = ref(false)
 const narrow = ref(false)
 const compact = ref(false)
@@ -154,6 +158,22 @@ async function confirmEnd(): Promise<void> {
 function goMinutes(): void {
   void router.push(`/discussions/${props.id}/minutes`)
 }
+
+async function restart(): Promise<void> {
+  if (restarting.value) {
+    return
+  }
+  restarting.value = true
+  restartError.value = null
+  try {
+    const created = await restartDiscussion(props.id)
+    await router.push(`/discussions/${created.id}/panel`)
+  } catch (err) {
+    restartError.value = err instanceof ApiError ? err.message : copy.errors.network
+  } finally {
+    restarting.value = false
+  }
+}
 </script>
 
 <template>
@@ -199,21 +219,32 @@ function goMinutes(): void {
             {{ copy.live.end }}
           </button>
         </template>
-        <button
-          v-if="store.status === 'SUMMARIZING' || store.status === 'CLOSED'"
-          type="button"
-          class="btn btn--primary"
-          data-testid="go-minutes"
-          @click="goMinutes"
-        >
-          {{ copy.live.viewMinutes }}
-        </button>
+        <template v-if="store.status === 'SUMMARIZING' || store.status === 'CLOSED'">
+          <button
+            type="button"
+            class="btn btn--primary"
+            data-testid="go-minutes"
+            @click="goMinutes"
+          >
+            {{ copy.live.viewMinutes }}
+          </button>
+          <button
+            type="button"
+            class="btn btn--sm"
+            data-testid="restart-discussion"
+            :disabled="restarting"
+            @click="restart"
+          >
+            {{ restarting ? copy.live.restarting : copy.live.restart }}
+          </button>
+        </template>
       </div>
     </header>
 
     <p v-if="store.connection === 'retrying'" class="banner banner--warning" data-testid="connection-banner">
       {{ copy.live.connectionRetrying(store.retryAttempt) }}
     </p>
+    <p v-if="restartError" class="banner banner--warning" data-testid="restart-error">{{ restartError }}</p>
     <p v-if="store.error" class="banner banner--error" data-testid="live-error">
       {{ store.error }}
       <button type="button" class="btn btn--sm" @click="store.clearError()">{{ copy.common.close }}</button>

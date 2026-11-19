@@ -42,6 +42,11 @@ export function deleteDiscussion(id: string): Promise<{ id: string; deleted: boo
   return api.del<{ id: string; deleted: boolean }>(`/discussions/${id}`)
 }
 
+/** 再来一场：复制议题与席位配置，返回新圆桌 id（新场为 DRAFT）。 */
+export function restartDiscussion(id: string): Promise<{ id: string }> {
+  return api.post<{ id: string }>(`/discussions/${id}/restart`)
+}
+
 export function fetchSeats(id: string): Promise<{ discussionId: string; status: string; seats: Seat[] }> {
   return api.get<{ discussionId: string; status: string; seats: Seat[] }>(`/discussions/${id}/panel`)
 }
