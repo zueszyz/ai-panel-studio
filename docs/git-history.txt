@@ -1,3 +1,36 @@
+3408fc9 2026-11-19 docs: audit project plan and record stress metrics
+5783ef5 2026-11-19 test(scripts): add 20-room stress script with metrics snapshot
+83d16eb 2026-11-19 refactor(server): build a rule-based rolling summary for older messages
+b877051 2026-11-19 test(server): cover stacked scoring signals in speaker policy
+21b2032 2026-11-19 docs: sync final counts and audit findings
+58e9e4e 2026-11-19 fix(e2e): wait for process kill in global teardown
+a003ca7 2026-11-19 fix(server): defer interrupt when any named responder is busy
+f14ba44 2026-11-19 fix(web): map DB_WRITE_FAILED to the 'may not be saved' hint
+f8db725 2026-11-19 fix(server): report exhausted DB writes as a failed message
+3d29fa8 2026-11-19 docs(api): specify DB_WRITE_FAILED for exhausted message writes
+f466c48 2026-11-19 docs: sync counts and record gap-closing audit round
+f6e1609 2026-11-19 test(e2e): require a recorded run before treating discussion as settled
+8c22ac4 2026-11-19 fix(server): defer interrupt turns when target seats are busy
+7e06804 2026-11-19 feat(web): highlight trace entries for the selected message
+3d6a5fb 2026-11-19 fix(web): map remaining documented error codes to Chinese copy
+03431b4 2026-11-19 feat(web): add restart action on ended discussions
+1029472 2026-11-19 feat(server): add restart endpoint for re-running a panel
+0cbe02b 2026-11-19 docs(api): specify restart endpoint for re-running a panel
+5f88787 2026-11-19 feat(web): expose interim summary entry on minutes page
+07f35f1 2026-11-19 feat(server): add non-persistent interim summary for live discussions
+57a3dee 2026-11-19 docs(api): specify interim summary for live discussions
+5672d72 2026-11-19 feat(web): add creator-only delete entry to lobby
+282c54d 2026-11-19 feat(server): implement soft delete with creator check and 410 links
+64c2df6 2026-11-19 docs(api): expose creator flag instead of raw user id
+199d952 2026-11-19 docs(api): specify soft-delete ownership and deleted-direct-link contract
+3c8e805 2026-11-19 docs: record sqlite busy retry contract and verification
+4b9fe32 2026-11-19 test(server): cover sqlite busy retry and concurrent writes
+c85a444 2026-11-19 feat(server): retry sqlite busy writes with bounded backoff
+34ffc19 2026-11-19 docs: sync m4-m5 contracts, prompt log and screenshots
+35c1cd5 2026-11-19 test(e2e): add five playwright specs with mock llm harness
+1ecd81c 2026-11-19 feat(web): add live and minutes pages with tokenized visual system
+466c303 2026-11-19 feat(server): add minutes module and session retry endpoint
+fc43257 2026-11-19 chore(scripts): normalize sqlite path to repo root in dev launchers
 c686eb6 2026-11-18 feat(server): build session actor with serial scheduling and parallel agents
 27b17a9 2026-11-17 docs(screenshots): refresh lobby and panel captures across four breakpoints
 4a124de 2026-11-17 style(web): use three columns on wide screens and tokenize accent borders
