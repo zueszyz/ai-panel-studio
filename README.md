@@ -184,7 +184,7 @@ ai-panel-studio/
 前置：JDK 17（`JAVA_HOME` 已配置）、Maven 3.9、Node 20 + pnpm 8。
 
 ```bash
-cp .env.example .env        # 填 LLM_API_KEY / LLM_BASE_URL（可选 SQLITE_PATH）
+cp .env.example .env        # 可选：填 LLM_API_KEY / LLM_BASE_URL / LLM_MODEL 接入真实模型；不填则用内置离线模型
 
 # 开发模式：后端 8080 + 前端 5173（Vite 代理 /api）
 ./scripts/dev.sh            # Windows: scripts\dev.bat
@@ -227,6 +227,8 @@ metrics: {"sseConnections":0,"activeSessions":20,"firstTokenMs":{"p50":59,"p95":
 ./scripts/build.sh          # 构建 web/dist → 复制到 server 静态目录 → mvn package
 java -jar server/target/panel-studio.jar  # http://localhost:8080
 ```
+
+> **零密钥也能完整演示**：未配置外部模型时自动启用内置离线模型，组局、并行发言、收束、纪要都能跑通并落库；`/api/health` 的 `llm` 返回 `local`。配置 `LLM_*` 后自动切换为真实模型，返回 `up`。
 
 `application.yml` 已配置 SQLite 连接参数（WAL / `busy_timeout` / `foreign_keys`），无需手工建库 —— 首次启动会在 `data/panel-studio.db` 自动建表并写入演示数据。备份：`sqlite3 data/panel-studio.db "VACUUM INTO 'data/backup.db'"`。
 

@@ -399,6 +399,23 @@
 
 ---
 
+### R-022 · 内置离线模型兜底（2026-11-19 19:40–20:00）
+
+- **阶段**：M5 收尾，解决「未配置模型密钥就无法对话」的开箱体验问题。
+- **目标**：用户明确要求「所有的数据回复等均可正常对话」——零密钥机器上也要能组局、开场、并行发言、收束、纪要并落库。
+- **Prompt（摘要）**：> 修复项目可能出现的问题，所有数据回复等均可正常对话。
+- **产出**：`infra/llm/OfflineLlmClient`（规则生成议题分析 / 席位档案 / 发言 / 收束 / 六段纪要，紧缺真实消息 id）；`OpenAiCompatibleClient` 在 `!configured` 时委托给它；`PanelService` 去掉 `notConfigured` 拦截；`/api/health` 的 `llm` 由 `down` 改为 `local`，`LlmHealthIndicator` 返回 `mode=local`；文案与 API/README 同步。
+- **人工决策点** `[me]`：
+  1. **在 LlmClient 层兜底而不是给每个服务加 if**：一处委托覆盖议题分析、席位、发言、收束、纪要全部调用点，避免遗漏；
+  2. **离线输出仍走既有 JSON 校验与溯源清洗**：`sourceMessageIds` 只取上下文中真实出现的 `ms_` id，不编造；
+  3. **不把离线内容伪装成真实模型**：health 明确 `local`，文档写明是演示级规则输出；配置 `LLM_*` 后自动切回真实模型。
+- **验证方式（命令 + 结果）**：
+  - `mvn -f server/pom.xml test` → 新增 `OfflineLlmClientTest` / `OfflineFallbackIntegrationTest` 全绿；
+  - 未配置 `LLM_BASE_URL` 的 Spring 上下文中 `LlmClient` 返回合法 JSON 与非空流式文本，不再抛 `LLM_NOT_CONFIGURED`。
+- **结论**：项目开箱即可完整演示；内置离线模型不替代生产模型，仅保证零密钥可用。
+
+---
+
 ## 4. 关键决策点索引
 | # | 决策 | 结论 | 记录 | 主要影响文件 |
 | --- | --- | --- | --- | --- |

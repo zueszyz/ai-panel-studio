@@ -293,6 +293,7 @@ data: {"code":"LLM_TIMEOUT","retriable":true,"keptVersion":1}
 ```json
 // health
 { "status": "ok", "db": "up", "llm": "up", "uptimeSec": 3821 }
+// llm=up 表示已配置外部模型；llm=local 表示正在使用内置离线模型（零密钥演示）
 // metrics（JSON，非 Prometheus 格式）
 { "sseConnections": 7, "activeSessions": 3, "firstTokenMs": { "p50": 1820, "p95": 4100 }, "agentFailureRate": 0.012, "sqliteBusy": 2 }
 ```
@@ -407,7 +408,7 @@ sse.on('message.delta', ({ messageId, seq, text }) => {
 | 429 | `LLM_RATE_LIMIT` / `REGEN_LIMIT` | 限流 / 重生成次数上限 | 是（退避） |
 | 504 | `LLM_TIMEOUT` | 模型超时 | 是（单条重试） |
 | 502 | `LLM_JSON_INVALID` / `LLM_UPSTREAM_ERROR` | 上游异常/输出不可解析 | 是 |
-| 503 | `LLM_NOT_CONFIGURED` | 后端未配置 `LLM_API_KEY` / `LLM_BASE_URL` / `LLM_MODEL`；`preset:true` 只能生成席位，发言 / 收束 / 纪要仍需模型 | 否（仅席位可用 preset） |
+| 503 | `LLM_NOT_CONFIGURED` | 兼容保留码：当前未配置外部模型时自动启用**内置离线模型**，正常生成分析与发言，不再抛此错误；`preset:true` 仍只影响席位 | 否 |
 | 409 | `DISCUSSION_STATE_INVALID` | 状态机拒绝的迁移（附带 `from` / `to`） | 否 |
 | 500 | `INTERNAL_ERROR` | 未预期异常（不回传堆栈与上游响应体） | 是（稍后） |
 | SSE | `DB_WRITE_FAILED` | 消息终态落库失败（重试耗尽）：`message.failed` 携带该 code，前端提示「本条可能未保存」 | 是（单条重试） |
