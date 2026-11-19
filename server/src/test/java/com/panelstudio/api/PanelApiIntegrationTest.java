@@ -43,24 +43,41 @@ class PanelApiIntegrationTest {
     private ObjectMapper objectMapper;
 
     private String createDiscussion() throws Exception {
+        return createDiscussion(4);
+    }
+
+    private String createDiscussion(int panelSize) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/discussions")
                         .header("X-Device-Id", DEVICE_A)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "topic", "我们要不要把这个季度的人效指标改成人均产出",
-                                "panelSize", 4))))
+                                "panelSize", panelSize))))
                 .andExpect(status().isCreated())
                 .andReturn();
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asText();
     }
 
     private String generatePanel(String discussionId, boolean regenerate, boolean preset) throws Exception {
+        return generatePanel(discussionId, regenerate, preset, null, false);
+    }
+
+    private String generatePanel(String discussionId, boolean regenerate, boolean preset,
+                                 String userRole, boolean autoStart) throws Exception {
+        java.util.Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("regenerate", regenerate);
+        payload.put("preset", preset);
+        if (userRole != null) {
+            payload.put("userRole", userRole);
+        }
+        if (autoStart) {
+            payload.put("autoStart", true);
+        }
         MvcResult result = mockMvc.perform(post("/api/discussions/" + discussionId + "/panel")
                         .header("X-Device-Id", DEVICE_A)
                         .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.TEXT_EVENT_STREAM, MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "regenerate", regenerate, "preset", preset))))
+                        .content(objectMapper.writeValueAsString(payload)))
                 .andExpect(request().asyncStarted())
                 .andReturn();
 
@@ -115,6 +132,72 @@ class PanelApiIntegrationTest {
         JsonNode seats = seatIdsFrom(body);
         assertThat(seats.get(0).get("roleType").asText()).isEqualTo("HOST");
         assertThat(seats.get(0).get("orderIndex").asInt()).isZero();
+    }
+
+    @Test
+    @DisplayName("五席位选座：用户自选技术专家，其余 AI 生成并自动开场")
+    void shouldReserveUserSeatAndAutoStart() throws Exception {
+        String discussionId = createDiscussion(5);
+        String body = generatePanel(discussionId, false, true, "TECH", true);
+
+        assertThat(eventNames(body).stream().filter("seat.added"::equals)).hasSize(5);
+        assertThat(body).contains("\"status\":\"LIVE\"");
+
+        JsonNode seats = readSeats(discussionId);
+        assertThat(seats.size()).isEqualTo(5);
+        JsonNode userSeat = null;
+        for (JsonNode seat : seats) {
+            if (seat.path("claimedByMe").asBoolean()) {
+                userSeat = seat;
+            }
+        }
+        assertThat(userSeat).as("必须保留一个属于用户的席位").isNotNull();
+        assertThat(userSeat.path("roleType").asText()).isEqualTo("TECH");
+        assertThat(userSeat.path("orderIndex").asInt()).isEqualTo(3);
+        assertThat(userSeat.path("status").asText()).isEqualTo("REPLACED_BY_USER");
+
+        mockMvc.perform(get("/api/discussions/" + discussionId + "/panel")
+                        .header("X-Device-Id", DEVICE_A))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("LIVE"))
+                .andExpect(jsonPath("$.seats.length()").value(5));
+
+        // 开场后不再允许换座，避免已生成发言的说话人对不上。
+        mockMvc.perform(post("/api/discussions/" + discussionId + "/claim")
+                        .header("X-Device-Id", DEVICE_B)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("seatId", seats.get(1).get("id").asText()))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("ALREADY_STARTED"));
+
+        mockMvc.perform(post("/api/discussions/" + discussionId + "/end"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("未认领的专家席位开场后由 AI 担任，认领其中的席位仍归本人")
+    void shouldKeepUnclaimedSeatsAsAi() throws Exception {
+        String discussionId = createDiscussion(5);
+        generatePanel(discussionId, false, true, "ANALYST", false);
+
+        JsonNode seats = readSeats(discussionId);
+        JsonNode userSeat = null;
+        for (JsonNode seat : seats) {
+            if (seat.path("claimedByMe").asBoolean()) {
+                userSeat = seat;
+            }
+        }
+        assertThat(userSeat).isNotNull();
+        assertThat(userSeat.path("roleType").asText()).isEqualTo("ANALYST");
+        assertThat(seats.size()).isEqualTo(5);
+
+        long aiSeats = 0;
+        for (JsonNode seat : seats) {
+            if (!seat.path("claimedByMe").asBoolean() && "ACTIVE".equals(seat.path("status").asText())) {
+                aiSeats++;
+            }
+        }
+        assertThat(aiSeats).isEqualTo(4);
     }
 
     @Test

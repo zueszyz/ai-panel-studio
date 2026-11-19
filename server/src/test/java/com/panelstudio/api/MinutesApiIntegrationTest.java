@@ -130,6 +130,30 @@ class MinutesApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("纪要补参会事实：席位名单、回合/消息数与用户关切来自本场数据")
+    void shouldIncludeParticipantFactsAndUserQuestions() throws Exception {
+        String discussionId = createLiveDiscussion();
+        String question = "迁移成本按什么口径算？";
+        mockMvc.perform(post("/api/discussions/" + discussionId + "/messages")
+                        .header("X-Device-Id", "minutes-device")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "content", question,
+                                "clientMsgId", "minutes-question-" + discussionId))))
+                .andExpect(status().isOk());
+        // 等这一轮发言真正收尾再结束：否则残留的模型调用会占住执行器，拖慢后续用例。
+        awaitUserReply(discussionId);
+        mockMvc.perform(post("/api/discussions/" + discussionId + "/end")).andExpect(status().isOk());
+
+        generateMinutes(discussionId, "event:minutes.done");
+        JsonNode meta = fetchMinutes(discussionId, null).path("structured").path("meta");
+        assertThat(meta.path("seatCount").asInt()).isEqualTo(4);
+        assertThat(meta.path("messageCount").asInt()).isGreaterThan(0);
+        assertThat(meta.path("participants").size()).isEqualTo(4);
+        assertThat(meta.path("userQuestions").toString()).contains(question);
+    }
+
+    @Test
     @DisplayName("I-9 生成失败不覆盖上一版：旧版本仍可读，响应带 keptVersion")
     void shouldKeepPreviousVersionOnFailure() throws Exception {
         String discussionId = createEndedDiscussion();
@@ -268,6 +292,34 @@ class MinutesApiIntegrationTest {
     }
 
     /** 建一场已经开场的讨论：席位已就绪 + 至少一条主持人发言。 */
+    /** 等到用户插话的回应落库，避免测试结束时还有模型调用在跑。 */
+    private void awaitUserReply(String discussionId) throws Exception {
+        long deadline = System.currentTimeMillis() + 15_000;
+        while (System.currentTimeMillis() < deadline) {
+            MvcResult result = mockMvc.perform(get("/api/discussions/" + discussionId + "/runs"))
+                    .andExpect(status().isOk())
+                    .andReturn();
+            JsonNode items = objectMapper.readTree(
+                    result.getResponse().getContentAsString(StandardCharsets.UTF_8)).path("items");
+            boolean busy = false;
+            boolean replied = false;
+            for (JsonNode item : items) {
+                String phase = item.path("phase").asText("");
+                if (!"DONE".equals(phase) && !"FAILED".equals(phase)) {
+                    busy = true;
+                }
+                if ("USER_INTERRUPT".equals(item.path("trigger").asText())
+                        && ("DONE".equals(phase) || "FAILED".equals(phase))) {
+                    replied = true;
+                }
+            }
+            if (replied && !busy) {
+                return;
+            }
+            Thread.sleep(100);
+        }
+    }
+
     private String createLiveDiscussion() throws Exception {
         String discussionId = createDraft();
         MvcResult panel = mockMvc.perform(post("/api/discussions/" + discussionId + "/panel")

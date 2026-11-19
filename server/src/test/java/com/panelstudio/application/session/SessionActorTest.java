@@ -5,6 +5,7 @@ import com.panelstudio.api.dto.StreamEvents.TurnStart;
 import com.panelstudio.domain.entity.AgentEntity;
 import com.panelstudio.domain.entity.MessageEntity;
 import com.panelstudio.domain.enums.AgentRoleType;
+import com.panelstudio.domain.enums.AgentStatus;
 import com.panelstudio.domain.enums.DiscussionStatus;
 import com.panelstudio.domain.support.UlidGenerator;
 import com.panelstudio.infra.config.AppProperties;
@@ -101,6 +102,23 @@ class SessionActorTest {
         assertThat(turns.get(0).speakers()).hasSize(2).doesNotContain("st_1");
         assertThat(actor.turnIndex()).isEqualTo(1);
         assertThat(store.turnIndex).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("被用户接手的席位不再由 AI 发言")
+    void shouldSkipSeatClaimedByUser() {
+        List<AgentEntity> seats = new ArrayList<>(seats());
+        seats.get(2).setStatus(AgentStatus.REPLACED_BY_USER);
+        actor = new SessionActor("dk_test", "要不要换向量召回", "判断该不该迁移",
+                seats, DiscussionStatus.LIVE, 0, store, publisher, runner, executor,
+                new UlidGenerator(), new Semaphore(3), new Semaphore(20), properties, List.of());
+
+        actor.startOpening();
+        assertThat(actor.awaitIdle(5000)).isTrue();
+
+        List<TurnStart> turns = publisher.payloadsOf("turn.start", TurnStart.class);
+        assertThat(turns).isNotEmpty();
+        assertThat(turns.get(0).speakers()).containsExactly("st_2");
     }
 
     @Test
