@@ -22,8 +22,9 @@ public class LlmHealthIndicator implements HealthIndicator {
     public Health health() {
         boolean configured = properties.getLlm().isConfigured();
         return Health.up()
+                .withDetail("mode", configured ? "remote" : "local")
                 .withDetail("configured", configured)
-                .withDetail("model", configured ? properties.getLlm().getModel() : "-")
+                .withDetail("model", configured ? properties.getLlm().getModel() : "offline-builtin")
                 .build();
     }
 }

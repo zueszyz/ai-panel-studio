@@ -35,7 +35,8 @@ public class HealthService {
             log.warn("数据库探活失败: {}", ex.getMessage());
             db = "down";
         }
-        String llm = properties.getLlm().isConfigured() ? "up" : "down";
+        // 未配置外部模型时由内置离线模型兜底，仍可正常对话。
+        String llm = properties.getLlm().isConfigured() ? "up" : "local";
         String status = "up".equals(db) ? "ok" : "degraded";
         return new HealthSnapshot(status, db, llm, ManagementFactory.getRuntimeMXBean().getUptime() / 1000);
     }

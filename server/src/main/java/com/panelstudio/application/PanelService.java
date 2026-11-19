@@ -214,9 +214,7 @@ public class PanelService {
         if (request.regenerateRequested() && discussion.getTopicAnalysis() != null) {
             return discussion.getTopicAnalysis();
         }
-        if (!properties.getLlm().isConfigured()) {
-            throw LlmException.notConfigured();
-        }
+        // 未配置外部模型时 LlmClient 自动委托到内置离线模型，无需在这里拦截。
         String raw = llmClient.chatJson(PromptTemplates.analysisSystem(),
                 PromptTemplates.analysisUser(discussion.getTopic(), discussion.getPanelSize())).content();
         return panelParser.parseAnalysis(raw);

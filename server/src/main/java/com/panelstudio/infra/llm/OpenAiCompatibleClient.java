@@ -38,11 +38,16 @@ public class OpenAiCompatibleClient implements LlmClient {
     private final ObjectMapper objectMapper;
     private final WebClient webClient;
     private final String chatUri;
+    private final boolean configured;
+    private final OfflineLlmClient offline;
 
-    public OpenAiCompatibleClient(AppProperties properties, ObjectMapper objectMapper) {
+    public OpenAiCompatibleClient(AppProperties properties, ObjectMapper objectMapper,
+                                  OfflineLlmClient offline) {
         this.properties = properties;
         this.objectMapper = objectMapper;
-        if (properties.getLlm().isConfigured()) {
+        this.offline = offline;
+        this.configured = properties.getLlm().isConfigured();
+        if (configured) {
             String baseUrl = stripTrailingSlash(properties.getLlm().getBaseUrl());
             this.chatUri = baseUrl + "/chat/completions";
             this.webClient = WebClient.builder()
@@ -57,7 +62,10 @@ public class OpenAiCompatibleClient implements LlmClient {
 
     @Override
     public LlmResult chatJson(String systemPrompt, String userPrompt) {
-        requireConfigured();
+        // 未配置外部模型时走内置离线模型，保证零密钥也能完整对话与落库。
+        if (!configured) {
+            return offline.chatJson(systemPrompt, userPrompt);
+        }
         long startedAt = System.currentTimeMillis();
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", properties.getLlm().getModel());
@@ -98,7 +106,9 @@ public class OpenAiCompatibleClient implements LlmClient {
 
     @Override
     public LlmResult chatStream(List<ChatMessage> messages, StreamListener listener, CancelToken token) {
-        requireConfigured();
+        if (!configured) {
+            return offline.chatStream(messages, listener, token);
+        }
         long startedAt = System.currentTimeMillis();
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", properties.getLlm().getModel());
@@ -192,12 +202,6 @@ public class OpenAiCompatibleClient implements LlmClient {
     private static int estimateTokens(int chars) {
         // 中文接近 1 字 ≈ 1 token，粗略按 2 字 ≈ 1 token 估算，宁少不多
         return Math.max(1, chars / 2);
-    }
-
-    private void requireConfigured() {
-        if (webClient == null) {
-            throw LlmException.notConfigured();
-        }
     }
 
     private LlmException translate(Throwable throwable, String stage) {
