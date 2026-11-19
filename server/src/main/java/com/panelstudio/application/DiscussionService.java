@@ -17,6 +17,7 @@ import com.panelstudio.domain.entity.DiscussionEntity;
 import com.panelstudio.domain.enums.AgentStatus;
 import com.panelstudio.domain.entity.MessageEntity;
 import com.panelstudio.domain.entity.ParticipantEntity;
+import com.panelstudio.domain.enums.AgentRoleType;
 import com.panelstudio.domain.enums.DiscussionStatus;
 import com.panelstudio.domain.support.IdPrefixes;
 import com.panelstudio.domain.support.UlidGenerator;
@@ -45,7 +46,7 @@ import java.util.stream.Collectors;
 @Service
 public class DiscussionService {
 
-    private static final int DEFAULT_PANEL_SIZE = 4;
+    private static final int DEFAULT_PANEL_SIZE = UserSeatPlan.DEFAULT_PANEL_SIZE;
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final int MAX_PAGE_SIZE = 50;
     private static final int PREVIEW_LENGTH = 42;
@@ -179,8 +180,14 @@ public class DiscussionService {
                     preview(latest.getContent()),
                     speakerName(latest, agentsById),
                     latest.getCreatedAt());
+            // 可加入的席位：非主持人、尚未被任何参与者接手。
+            int openSeatCount = (int) seats.stream()
+                    .filter(seat -> seat.getRoleType() != AgentRoleType.HOST)
+                    .filter(seat -> seat.getStatus() == AgentStatus.ACTIVE)
+                    .count();
             items.add(new DiscussionSummary(row.getId(), row.getTopic(), isCreator(row, userId), row.getStatus(),
-                    row.getPanelSize(), row.getTurnIndex(), seatBriefs, lastMessage, row.getUpdatedAt()));
+                    row.getPanelSize(), row.getTurnIndex(), seatBriefs, openSeatCount, lastMessage,
+                    row.getUpdatedAt()));
         }
         String nextCursor = hasMore ? CursorCodec.encode(offset + pageSize) : null;
         return new DiscussionListResponse(items, nextCursor);

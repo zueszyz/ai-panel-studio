@@ -39,11 +39,14 @@ public class PanelController {
     @PostMapping("/panel")
     @Operation(summary = "生成席位（逐个席位推送）")
     public SseEmitter generate(@PathVariable("id") String id,
+                               @RequestHeader(value = "X-Device-Id", required = false) String deviceId,
                                @RequestBody(required = false) CreatePanelRequest request,
                                HttpServletResponse response) {
         prepareSseResponse(response);
-        CreatePanelRequest payload = request == null ? new CreatePanelRequest(false, false) : request;
-        return panelService.generate(id, payload);
+        CreatePanelRequest payload = request == null
+                ? new CreatePanelRequest(false, false, null, false)
+                : request;
+        return panelService.generate(id, payload, deviceId);
     }
 
     @GetMapping("/panel")

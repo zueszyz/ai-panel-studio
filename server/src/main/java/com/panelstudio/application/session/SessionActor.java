@@ -324,7 +324,8 @@ public final class SessionActor {
             return false;
         }
         AgentEntity seat = seatById.get(target.getAgentId());
-        if (seat == null) {
+        if (seat == null
+                || seat.getStatus() == com.panelstudio.domain.enums.AgentStatus.REPLACED_BY_USER) {
             return false;
         }
         CancelToken token = new CancelToken();
@@ -350,6 +351,8 @@ public final class SessionActor {
         int round = turnIndex.get() + 1;
         List<SpeakerPolicy.Candidate> candidates = seats.stream()
                 .filter(seat -> seat.getRoleType() != AgentRoleType.HOST)
+                // 被用户接手的席位由本人发言：AI 不能再替这个席位生成内容。
+                .filter(seat -> seat.getStatus() != com.panelstudio.domain.enums.AgentStatus.REPLACED_BY_USER)
                 .map(seat -> new SpeakerPolicy.Candidate(seat.getId(), seat.getName(), seat.getFocus(),
                         lastSpokeRound.getOrDefault(seat.getId(), 0),
                         spokenThisRound.contains(seat.getId())))

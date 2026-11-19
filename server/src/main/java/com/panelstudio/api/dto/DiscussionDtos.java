@@ -10,6 +10,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 import java.util.List;
+import java.util.Locale;
 
 /** 大厅与组局相关的请求/响应体，字段与 docs/API.md §2 对齐。 */
 public final class DiscussionDtos {
@@ -58,6 +59,7 @@ public final class DiscussionDtos {
             int panelSize,
             int turnIndex,
             List<SeatBrief> seats,
+            int openSeatCount,
             LastMessageView lastMessage,
             String updatedAt) {
     }
@@ -103,13 +105,25 @@ public final class DiscussionDtos {
     public record ClaimResponse(String seatId, String role, String displayName, AgentStatus seatStatus) {
     }
 
-    public record CreatePanelRequest(Boolean regenerate, Boolean preset) {
+    /**
+     * 组局请求。{@code userRole} 是用户自选的专家角色（如 STRATEGIST），
+     * 服务端据此保留该席位，只让 AI 生成其余席位；{@code autoStart} 表示生成完立即开场。
+     */
+    public record CreatePanelRequest(Boolean regenerate, Boolean preset, String userRole, Boolean autoStart) {
         public boolean regenerateRequested() {
             return Boolean.TRUE.equals(regenerate);
         }
 
         public boolean presetRequested() {
             return Boolean.TRUE.equals(preset);
+        }
+
+        public boolean autoStartRequested() {
+            return Boolean.TRUE.equals(autoStart);
+        }
+
+        public String userRoleValue() {
+            return userRole == null || userRole.isBlank() ? null : userRole.trim().toUpperCase(Locale.ROOT);
         }
     }
 }

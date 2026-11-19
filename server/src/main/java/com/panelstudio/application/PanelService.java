@@ -8,6 +8,7 @@ import com.panelstudio.api.dto.DiscussionDtos.SeatView;
 import com.panelstudio.api.dto.PanelEvents.Analysis;
 import com.panelstudio.api.dto.PanelEvents.Done;
 import com.panelstudio.api.dto.PanelEvents.Failed;
+import com.panelstudio.application.session.DiscussionSessionService;
 import com.panelstudio.domain.entity.AgentEntity;
 import com.panelstudio.domain.entity.DiscussionEntity;
 import com.panelstudio.domain.entity.ParticipantEntity;
@@ -56,11 +57,9 @@ public class PanelService {
 
     private static final Set<DiscussionStatus> EDITABLE =
             EnumSet.of(DiscussionStatus.DRAFT, DiscussionStatus.PANEL_READY, DiscussionStatus.FAILED);
-    private static final List<AgentRoleType> EXPERT_ROLES = List.of(
-            AgentRoleType.STRATEGIST, AgentRoleType.ANALYST, AgentRoleType.TECH,
-            AgentRoleType.FINANCE, AgentRoleType.RESEARCHER);
 
     private final DiscussionService discussionService;
+    private final DiscussionSessionService sessionService;
     private final PanelPersistService persistService;
     private final PanelParser panelParser;
     private final LlmClient llmClient;
@@ -72,6 +71,7 @@ public class PanelService {
     private final UlidGenerator idGenerator;
 
     public PanelService(DiscussionService discussionService,
+                        DiscussionSessionService sessionService,
                         PanelPersistService persistService,
                         PanelParser panelParser,
                         LlmClient llmClient,
@@ -82,6 +82,7 @@ public class PanelService {
                         UserService userService,
                         UlidGenerator idGenerator) {
         this.discussionService = discussionService;
+        this.sessionService = sessionService;
         this.persistService = persistService;
         this.panelParser = panelParser;
         this.llmClient = llmClient;
@@ -95,7 +96,7 @@ public class PanelService {
 
     // ── 席位生成 ────────────────────────────────────────────
 
-    public SseEmitter generate(String discussionId, CreatePanelRequest request) {
+    public SseEmitter generate(String discussionId, CreatePanelRequest request, String deviceId) {
         DiscussionEntity discussion = discussionService.requireDiscussion(discussionId);
         if (!EDITABLE.contains(discussion.getStatus())) {
             throw new ApiException(HttpStatus.CONFLICT, "DISCUSSION_STATE_INVALID",
@@ -108,23 +109,39 @@ public class PanelService {
                     "换一批次数已用完（最多 " + properties.getPanel().getRegenLimit() + " 次）");
         }
         SseEmitter emitter = new SseEmitter(0L);
-        agentExecutor.execute(() -> runGeneration(emitter, discussionId, request));
+        agentExecutor.execute(() -> runGeneration(emitter, discussionId, request, deviceId));
         return emitter;
     }
 
-    private void runGeneration(SseEmitter emitter, String discussionId, CreatePanelRequest request) {
+    private void runGeneration(SseEmitter emitter, String discussionId, CreatePanelRequest request,
+                               String deviceId) {
         try {
             DiscussionEntity discussion = discussionService.requireDiscussion(discussionId);
             List<AgentEntity> existing = agentMapper.findByDiscussionId(discussionId);
             Set<String> claimedSeatIds = participantMapper.findClaimedSeats(discussionId).stream()
                     .map(ParticipantEntity::getSeatId)
                     .collect(Collectors.toCollection(HashSet::new));
+            String userId = userService.resolveUserId(deviceId);
+            ParticipantEntity mine = userId == null ? null
+                    : participantMapper.findByDiscussionAndUser(discussionId, userId);
+            String mySeatId = mine == null ? null : mine.getSeatId();
+
+            AgentRoleType userRole = parseUserRole(request.userRoleValue());
+            int userIndex = userRole == null ? -1 : UserSeatPlan.orderIndexOf(userRole);
+            if (userRole != null && (userIndex < 1 || userIndex >= discussion.getPanelSize())) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+                        "选择的席位不在当前面板内", Map.of("field", "userRole"));
+            }
 
             boolean idempotent = !request.regenerateRequested() && !request.presetRequested()
                     && discussion.getStatus() == DiscussionStatus.PANEL_READY
                     && existing.size() == discussion.getPanelSize();
             if (idempotent) {
-                pushExistingPanel(emitter, discussion, existing, claimedSeatIds);
+                pushExistingPanel(emitter, discussion, existing, claimedSeatIds,
+                        !request.autoStartRequested());
+                if (request.autoStartRequested()) {
+                    startAndReport(emitter, discussionId, existing.size());
+                }
                 return;
             }
 
@@ -147,9 +164,24 @@ public class PanelService {
             boolean preset = request.presetRequested();
             List<SeatDraft> presetSeats = preset ? PresetPanels.seats(discussion.getTopic(), panelSize) : List.of();
 
-            int expertSequence = 0;
+            // 用户自选的席位：已有认领就沿用；否则按所选角色保留一席，作为"你"的席位。
+            String userSeatId = mySeatId;
+            boolean reservedUserIndex = false;
+            if (userSeatId == null && userRole != null) {
+                SeatDraft userDraft = UserSeatPlan.draft(userRole);
+                String seatId = idGenerator.nextWithPrefix(IdPrefixes.SEAT);
+                created.add(new PanelPersistService.NewSeat(seatId, userIndex, userDraft,
+                        AgentStatus.REPLACED_BY_USER));
+                knownDrafts.add(userDraft);
+                userSeatId = seatId;
+                reservedUserIndex = true;
+                send(emitter, "seat.added",
+                        toSeatView(seatId, userIndex, userDraft, true, AgentStatus.REPLACED_BY_USER));
+            }
+
             for (int index = 0; index < panelSize; index++) {
-                if (occupied.contains(index)) {
+                // 已被认领的席位与用户自选席位都跳过，其余交给 AI。
+                if (occupied.contains(index) || (reservedUserIndex && index == userIndex)) {
                     continue;
                 }
                 boolean hostSeat = index == 0;
@@ -157,12 +189,9 @@ public class PanelService {
                 if (preset) {
                     draft = presetSeats.get(Math.min(index, presetSeats.size() - 1));
                 } else {
-                    AgentRoleType roleType = hostSeat
-                            ? AgentRoleType.HOST
-                            : EXPERT_ROLES.get(Math.min(expertSequence, EXPERT_ROLES.size() - 1));
+                    AgentRoleType roleType = hostSeat ? AgentRoleType.HOST : UserSeatPlan.roleAt(index);
                     draft = generateSeat(discussion.getTopic(), index, panelSize, hostSeat, roleType, knownDrafts);
                 }
-                expertSequence++;
                 knownDrafts.add(draft);
                 String seatId = idGenerator.nextWithPrefix(IdPrefixes.SEAT);
                 created.add(new PanelPersistService.NewSeat(seatId, index, draft));
@@ -174,7 +203,11 @@ public class PanelService {
                     .map(AgentEntity::getId)
                     .toList();
             persistService.replacePanel(discussionId, analysis.getGoal(), analysis, created, toDelete,
-                    request.regenerateRequested());
+                    request.regenerateRequested(), userSeatId, userId);
+            if (request.autoStartRequested()) {
+                startAndReport(emitter, discussionId, panelSize);
+                return;
+            }
             send(emitter, "panel.done", new Done(discussionId, DiscussionStatus.PANEL_READY, panelSize,
                     preset ? "PRESET" : null));
             emitter.complete();
@@ -192,8 +225,25 @@ public class PanelService {
         }
     }
 
+    /** 生成完立即开场（用户点「生成其他席位并开始」时走这里）。 */
+    private void startAndReport(SseEmitter emitter, String discussionId, int panelSize) {
+        DiscussionStatus status = DiscussionStatus.PANEL_READY;
+        try {
+            status = DiscussionStatus.valueOf(sessionService.start(discussionId).status());
+        } catch (ApiException ex) {
+            // 重复点击或客户端重试时可能已经开场，以库里状态为准，不算失败。
+            status = discussionService.requireDiscussion(discussionId).getStatus();
+            if (status != DiscussionStatus.LIVE && status != DiscussionStatus.INTERRUPTED) {
+                log.warn("自动开场失败 discussionId={} code={}", discussionId, ex.code());
+            }
+        }
+        send(emitter, "panel.done", new Done(discussionId, status, panelSize, null));
+        emitter.complete();
+    }
+
     private void pushExistingPanel(SseEmitter emitter, DiscussionEntity discussion,
-                                   List<AgentEntity> seats, Set<String> claimedSeatIds) {
+                                   List<AgentEntity> seats, Set<String> claimedSeatIds,
+                                   boolean sendDone) {
         TopicAnalysis analysis = discussion.getTopicAnalysis();
         if (analysis == null) {
             analysis = PresetPanels.analysis(discussion.getTopic());
@@ -203,8 +253,11 @@ public class PanelService {
         for (AgentEntity seat : seats) {
             send(emitter, "seat.added", toSeatView(seat, claimedSeatIds.contains(seat.getId())));
         }
-        send(emitter, "panel.done", new Done(discussion.getId(), discussion.getStatus(), seats.size(), null));
-        emitter.complete();
+        if (sendDone) {
+            send(emitter, "panel.done", new Done(discussion.getId(), discussion.getStatus(),
+                    seats.size(), null));
+            emitter.complete();
+        }
     }
 
     private TopicAnalysis resolveAnalysis(DiscussionEntity discussion, CreatePanelRequest request) {
@@ -251,6 +304,11 @@ public class PanelService {
         if (discussion.getStatus() == DiscussionStatus.CLOSED
                 || discussion.getStatus() == DiscussionStatus.SUMMARIZING) {
             throw new ApiException(HttpStatus.CONFLICT, "DISCUSSION_CLOSED", "这场圆桌已结束");
+        }
+        // 席位只在筹备阶段可换：开场后再换人，已经生成的发言会对不上说话人。
+        if (discussion.getStatus() == DiscussionStatus.LIVE) {
+            throw new ApiException(HttpStatus.CONFLICT, "ALREADY_STARTED",
+                    "讨论已经开始，不能再更换席位");
         }
         String userId = userService.resolveUserId(deviceId);
         if (userId == null) {
@@ -347,9 +405,30 @@ public class PanelService {
     }
 
     private SeatView toSeatView(String seatId, int orderIndex, SeatDraft draft, boolean claimedByMe) {
+        return toSeatView(seatId, orderIndex, draft, claimedByMe, AgentStatus.ACTIVE);
+    }
+
+    private SeatView toSeatView(String seatId, int orderIndex, SeatDraft draft, boolean claimedByMe,
+                                AgentStatus status) {
         return new SeatView(seatId, draft.getRoleType(), draft.getName(), draft.getTitle(),
                 draft.getStance(), draft.getFocus(), draft.getVoice(), draft.getColorToken(),
-                orderIndex, AgentStatus.ACTIVE, claimedByMe);
+                orderIndex, status, claimedByMe);
+    }
+
+    private AgentRoleType parseUserRole(String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            AgentRoleType role = AgentRoleType.valueOf(value);
+            if (UserSeatPlan.isExpert(role)) {
+                return role;
+            }
+        } catch (IllegalArgumentException ignored) {
+            // 落到下面的统一校验错误
+        }
+        throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+                "席位角色不合法", Map.of("field", "userRole"));
     }
 
     private SeatDraft toDraft(AgentEntity seat) {
