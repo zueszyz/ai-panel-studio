@@ -7,7 +7,7 @@
  *
  * 依赖：JDK 17 / Maven / pnpm 已在本机可用（与 README §5 的前置一致）。
  */
-import { spawn, type ChildProcess } from 'node:child_process'
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { createWriteStream, mkdirSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -67,7 +67,10 @@ function stop(child: ChildProcess | undefined): void {
     return
   }
   if (IS_WIN) {
-    spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' })
+    // 必须同步等待 taskkill 完成：异步 spawn 后 Playwright 立即退出，
+    // 子进程（mvn 启动的 java / pnpm 启动的 vite）会残留并占住 e2e.db 与端口，
+    // 下一次 pretest 删库就报 EPERM。
+    spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' })
     return
   }
   try {
