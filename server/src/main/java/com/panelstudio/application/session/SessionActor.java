@@ -53,6 +53,8 @@ public final class SessionActor {
     private static final Logger log = LoggerFactory.getLogger(SessionActor.class);
     private static final int HISTORY_LIMIT = 30;
     private static final int GATE_WAIT_SECONDS = 30;
+    /** 插话等待目标席位空闲的最长时间：模型首 token 可能到 45s，不能 1s 就放弃。 */
+    private static final long INTERRUPT_WAIT_MS = 30_000L;
 
     private final String discussionId;
     private final String topic;
@@ -64,8 +66,8 @@ public final class SessionActor {
     private final Map<String, Integer> lastSpokeRound = new ConcurrentHashMap<>();
     private final Set<String> spokenThisRound = ConcurrentHashMap.newKeySet();
     private final Map<String, CancelToken> inflight = new ConcurrentHashMap<>();
-    /** 插话重试次数（按 user messageId）：席位都忙时延后再答复，避免插话被静默丢弃。 */
-    private final Map<String, Integer> interruptRetries = new ConcurrentHashMap<>();
+    /** 插话等待截止时间（按 user messageId）：席位忙时延后答复，避免插话被静默丢弃。 */
+    private final Map<String, Long> interruptDeadlines = new ConcurrentHashMap<>();
     private final List<MessageEntity> history = Collections.synchronizedList(new ArrayList<>());
     private final Deque<Runnable> queue = new ConcurrentLinkedDeque<>();
     private final AtomicBoolean draining = new AtomicBoolean(false);
@@ -187,18 +189,20 @@ public final class SessionActor {
         // 否则部分席位被跳过会让"同时点名两位"只剩一个人回应。
         if (user != null && !speakers.isEmpty()
                 && speakers.stream().anyMatch(inflight::containsKey)) {
-            int attempt = interruptRetries.merge(user.getId(), 1, Integer::sum);
-            if (attempt <= 3) {
+            long deadline = interruptDeadlines.computeIfAbsent(user.getId(),
+                    key -> System.currentTimeMillis() + INTERRUPT_WAIT_MS);
+            if (System.currentTimeMillis() < deadline) {
                 CompletableFuture.delayedExecutor(300L, TimeUnit.MILLISECONDS)
                         .execute(() -> enqueue(() -> runTurn(speakers, reason, user, quotedSeatId)));
-                log.debug("插话 {} 有目标席位还在发言，第 {} 次延后响应", user.getId(), attempt);
+                log.debug("插话 {} 有目标席位还在发言，继续延后（截止 {}）", user.getId(), deadline);
             } else {
+                interruptDeadlines.remove(user.getId());
                 publisher.publish(discussionId, "error", new ErrorFrame("AGENT_BUSY",
                         "嘉宾都还在发言，这条插话暂未得到回应，请稍后再发一次", true));
             }
             return;
         }
-        interruptRetries.remove(user == null ? "" : user.getId());
+        interruptDeadlines.remove(user == null ? "" : user.getId());
         int round = turnIndex.incrementAndGet();
         spokenThisRound.clear();
         spokenThisRound.addAll(speakers);
