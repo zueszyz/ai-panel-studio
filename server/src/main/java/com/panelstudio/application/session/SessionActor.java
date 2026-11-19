@@ -183,14 +183,15 @@ public final class SessionActor {
                     new ErrorFrame("BUDGET_EXHAUSTED", "本场 token 预算已用完，请结束讨论并生成纪要", false));
             return;
         }
-        // 插话不能丢（FR-4）：目标席位都还在发言时，等它们结束再答复，而不是跳过本回合。
+        // 插话不能丢（FR-4）：只要有一位目标席位还在发言，就整轮延后，
+        // 否则部分席位被跳过会让"同时点名两位"只剩一个人回应。
         if (user != null && !speakers.isEmpty()
-                && speakers.stream().allMatch(inflight::containsKey)) {
+                && speakers.stream().anyMatch(inflight::containsKey)) {
             int attempt = interruptRetries.merge(user.getId(), 1, Integer::sum);
             if (attempt <= 3) {
                 CompletableFuture.delayedExecutor(300L, TimeUnit.MILLISECONDS)
                         .execute(() -> enqueue(() -> runTurn(speakers, reason, user, quotedSeatId)));
-                log.debug("插话 {} 的目标席位都在发言，第 {} 次延后响应", user.getId(), attempt);
+                log.debug("插话 {} 有目标席位还在发言，第 {} 次延后响应", user.getId(), attempt);
             } else {
                 publisher.publish(discussionId, "error", new ErrorFrame("AGENT_BUSY",
                         "嘉宾都还在发言，这条插话暂未得到回应，请稍后再发一次", true));
