@@ -1,3 +1,9 @@
+f17e4ec 2026-11-19 docs: sync 80-test count and zero-key verification
+6ff31ce 2026-11-19 docs: document zero-key offline model fallback
+38263ea 2026-11-19 feat(web): describe built-in offline model in user-facing copy
+ce3a09e 2026-11-19 test(server): cover built-in offline model fallback
+2b8fac9 2026-11-19 feat(server): add built-in offline LLM fallback for zero-key runs
+ace2a97 2026-11-19 docs: refresh git history export after audit fixes
 76a4216 2026-11-19 docs: log interrupt deadline and flaky test fixes
 9c72bd3 2026-11-19 test(server): register retry fault stub after the auto-started round
 9468e59 2026-11-19 test(e2e): wait for streaming cards to clear before interrupting
