@@ -41,7 +41,7 @@
 ### M1 骨架
 
 - [ ] 落地 `AGENTS.md` + `rules/`（6 份约束：项目边界 / 架构 / 前端视觉 / 接口并发 / 数据测试 / 工作流），作为后续所有 AI 会话的开工前置
-- [ ] `server/pom.xml`：Spring Boot 3.5.16 parent、`spring-boot-starter-web/validation/actuator/test`、`mybatis-plus-spring-boot3-starter`、`flyway-core` + `flyway-database-sqlite`、`sqlite-jdbc`、`springdoc-openapi-starter-webmvc-ui`、`logstash-logback-encoder`、`wiremock-standalone(test)`
+- [ ] `server/pom.xml`：Spring Boot 3.5.16 parent、`spring-boot-starter-web/validation/actuator/test`、`mybatis-plus-spring-boot3-starter`、`flyway-core`（Flyway 11 的 SQLite 方言已内含，无需也不存在 `flyway-database-sqlite`）、`sqlite-jdbc`、`springdoc-openapi-starter-webmvc-ui`、`logstash-logback-encoder`、`wiremock-standalone(test)`
 - [ ] `application.yml`（SQLite URL + Hikari + Flyway + 异步线程池 + 压缩/超时）+ `application-test.yml`
 - [ ] Flyway `V1__schema.sql`（7 表）/ `V2__indexes.sql` / `V3__seed_demo.sql`
 - [ ] `PanelStudioApplication`、`AsyncConfig`（`agentExecutor` + `MdcTaskDecorator`）、`MybatisPlusConfig`（分页 + `JacksonTypeHandler`）
@@ -189,7 +189,7 @@
 
 - [ ] `mvn -f server/pom.xml test` 全绿；`pnpm -C web build` 成功；3 条 E2E 全绿（本机，无容器）
 - [ ] `java -jar server/target/panel-studio.jar` 单进程可完整演示（含前端静态资源）
-- [ ] 18 个接口与 API 文档一致（含错误码）；Swagger UI 可访问
+- [ ] 19 个接口与 API 文档一致（含错误码）；Swagger UI 可访问
 - [ ] 7 张表由 Flyway 建出，纪要可从 SQLite 重新读取（重启后仍在）
 - [ ] `git log` ≥ 30 条，message 可读，提交粒度合理
 - [ ] README 含运行说明、架构图、AI 使用说明、边界声明与"不使用容器"的说明
@@ -209,3 +209,26 @@
 | 文档与过程 | 10 | 9 份文档（架构图/ER/状态机/时序图）；Prompt 五要素；commit 粒度 | 8 |
 
 > 自检表与"主动放弃的分"见 [DELIVERY](DELIVERY.md) §6。权重已按作业最新说明（产品完成度 30 最高）重排，因此"纪要闭环 + 溯源"排在"换一批""版本切换"等 P1 之前。
+
+---
+
+## 7. 计划项核查结果（2026-11-19）
+
+> 对照第 2 节 WBS 与第 5 节 DoD 逐项核对代码与运行结果；下表只记录「与计划文本不一致」或「需人工交付」的项，其余按已实现处理。
+
+| 计划项 | 核查结论 | 处理 |
+| --- | --- | --- |
+| M1 `flyway-database-sqlite` | 该 artifact 不存在；Flyway 11 的 SQLite 方言在 `flyway-core` 内 | 已按可验证事实回改本节 M1 条目，pom 保持只依赖 `flyway-core` |
+| M1 `vite.config.ts` | 实际文件为 `web/vite.config.js`（项目用 ESM + JS，无 TS 配置） | 命名差异，不影响功能；按实际文件名为准 |
+| M3 `SpeakerPolicy` 6 个单测 | 原为 5 个 | 补「点名 + 关注点 + 引用叠加」用例，现为 6 个 |
+| M3 `ContextBuilder` 滚动摘要 | 原仅丢弃旧消息并提示「已折叠为 N 条」，没有摘要内容 | 改为规则化摘要（发言人 × 次数 + 回合范围，≤400 字），旧原文不再回灌 |
+| M5 压测脚本 + `/metrics` 写入 README | 原缺失 | 新增 `scripts/stress.mjs`，20 场 × 4 席位实测数据写入 README §5 |
+| M5 5 张工作流程截图 | 仓库 `docs/screenshots/` 只有 4 页 × 断点的产品截图，没有 5 张流程截图 | **待人工交付**：需在 CodeBuddy 会话中按 DELIVERY §2.3 逐张截取 |
+| M5 演示视频（3–5 分钟） | 未生成 | **待人工交付**：按 DELIVERY §5 分镜录制 |
+| M5 按 DELIVERY §5 发送邮件 | 外部动作，仓库内无法完成 | **待人工执行**：简历 + 作品 / 仓库 / 视频链接 |
+| DoD 接口数 | 计划写 18，API.md 与 Controller 实为 19 | 已回改为 19（新增软删除 / 再来一场 / 阶段性小结参数） |
+| DoD 单 jar 演示 | `scripts/build.sh` 通过，含前端静态资源 | 已验证；最近一次变更后需重新执行构建再录制 |
+
+**自动化门禁**：`mvn test` 67 例全绿；`pnpm -C web build` 通过；`pnpm -C e2e test` 5 条全绿；`node scripts/stress.mjs` 20 场完成、`sqliteBusy=0`。
+
+**仍待人工**：工作流程截图、演示视频、邮件投递三项不属于代码产出，未伪造替代。

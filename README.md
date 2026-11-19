@@ -205,6 +205,22 @@ pnpm -C web build                   # vue-tsc 类型检查 + 构建
 pnpm -C e2e test                    # 5 条 E2E（自动拉起假模型 / 后端 / 前端）
 ```
 
+压测（需先启动后端；20 场 × 4 席位，组局走预设阵容，不需要真实模型密钥）：
+
+```bash
+node scripts/stress.mjs             # ROOMS / PANEL_SIZE / API_BASE 可覆盖
+```
+
+2026-11-19 实测（假模型 `:9099`，4 路并发 × 5 批）：
+
+```
+列表首屏：冷库 80ms；压测并发下 1257ms
+单场耗时：P50 2051ms / P95 8666ms
+metrics: {"sseConnections":0,"activeSessions":20,"firstTokenMs":{"p50":59,"p95":251},"agentFailureRate":0,"sqliteBusy":0}
+```
+
+> 列表首屏在 20 场同时开场的压力下高于 PRD 的 800ms 目标；空闲单请求约 80ms。`sqliteBusy=0` 说明 WAL + `busy_timeout` + 短事务已消化写锁竞争。
+
 演示模式（单进程，交付/录视频用这一条）：
 
 ```bash
