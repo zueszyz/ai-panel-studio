@@ -10,7 +10,7 @@
 | 路径版本 | v1，路径不带版本号；破坏性变更时升 `/api/v2` |
 | 实现 | Spring MVC `@RestController` + `SseEmitter`；DTO 用 `record` + Jakarta Validation；错误统一由 `@RestControllerAdvice` 输出 |
 | 在线文档 | springdoc-openapi 2.x → `GET /swagger-ui.html`（与本文档双向对齐，注解即契约） |
-| 接口数 | 18（REST 15 + SSE 3），满足 ≥8 的要求 |
+| 接口数 | 19（REST 16 + SSE 3），满足 ≥8 的要求 |
 | 规模对照 | 支撑 4 个前端路由（`/` `/panel` `/live` `/minutes`）、7 张表；讨论 CRUD / 消息 / SSE 流式 / 汇总四类能力齐全 |
 
 ---
@@ -24,6 +24,7 @@
 | 3 | POST | `/discussions` | 创建圆桌（议题 + 人数） | JSON |
 | 4 | GET | `/discussions/:id` | 详情（席位 + 我是否参与） | JSON |
 | 5 | DELETE | `/discussions/:id` | 软删除（仅创建者） | JSON |
+| 5b | POST | `/discussions/:id/restart` | 同议题再来一场（复制席位配置） | JSON |
 | 6 | POST | `/discussions/:id/panel` | 生成席位（流式逐席位返回） | **SSE** |
 | 7 | GET | `/discussions/:id/panel` | 查询席位 | JSON |
 | 8 | POST | `/discussions/:id/claim` | 认领 / 撤销认领席位 | JSON |
@@ -113,6 +114,17 @@ X-Device-Id: 7c1f...a9
 - 只写 `deleted_at`，不删数据；列表（`GET /discussions`）不再返回，直链（详情 / 席位 / 讨论流 / 纪要）统一返回 `410 DISCUSSION_DELETED`。
 - 仅创建者可删（`createdBy` 与 `X-Device-Id` 解析出的 `userId` 相同），他人返回 `403 FORBIDDEN`；未提供设备头也返回 `403 FORBIDDEN`。
 - 删除会同时停掉该场在内存中的调度并关闭其 SSE 连接；重复删除返回 `410 DISCUSSION_DELETED`。
+
+### 2.2c `POST /discussions/:id/restart` 再来一场
+
+```json
+// 201：新建一块 DRAFT 圆桌，id 与原场不同
+{ "id": "dk_new", "topic": "…", "status": "DRAFT", "panelSize": 4, "turnIndex": 0, "createdAt": "…" }
+```
+
+- 复制议题、目标、`topicAnalysis`、`panelSize` 与席位配置（姓名 / 身份 / 立场 / 关注点 / 声线 / 色标）；新席位全部 `ACTIVE`、重新分配 id。
+- **不复制**消息、认领记录、纪要与回合进度；新场 `turnIndex=0`、`regenCount=0`、状态 `DRAFT`，需重新生成席位或直接使用复制来的席位开场。
+- 原场不存在 / 已删除按统一错误体返回 404 / 410。
 
 ### 2.3 `POST /discussions/:id/panel` 生成席位（SSE）
 
