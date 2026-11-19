@@ -175,7 +175,7 @@ ai-panel-studio/
 ```
 
 > 当前进度：**M1 骨架 + M2（大厅 / 组局）+ M3（讨论内核）+ M4（纪要收敛）+ M5（质量）已落地**。
-> 后端 `mvn test` 74 例全绿；前端 `pnpm build` 通过；`pnpm -C e2e test` 5 条 E2E 全绿（约 35s，假模型驱动，不需要 API Key）。
+> 后端 `mvn test` 80 例全绿；前端 `pnpm build` 通过；`pnpm -C e2e test` 5 条 E2E 全绿（约 35s，假模型驱动，不需要 API Key）。
 
 ## 5. 快速开始
 
@@ -200,7 +200,7 @@ pnpm -C web install && pnpm -C web dev    # http://localhost:5173
 跑测试（三件套，都不需要容器与真实模型）：
 
 ```bash
-mvn -f server/pom.xml test          # 单元 + 集成 74 例
+mvn -f server/pom.xml test          # 单元 + 集成 80 例
 pnpm -C web build                   # vue-tsc 类型检查 + 构建
 pnpm -C e2e test                    # 5 条 E2E（自动拉起假模型 / 后端 / 前端）
 ```
@@ -220,6 +220,8 @@ metrics: {"sseConnections":0,"activeSessions":20,"firstTokenMs":{"p50":59,"p95":
 ```
 
 > 列表首屏在 20 场同时开场的压力下高于 PRD 的 800ms 目标；空闲单请求约 80ms。`sqliteBusy=0` 说明 WAL + `busy_timeout` + 短事务已消化写锁竞争。
+
+> 零密钥验证（未配 `LLM_*`，内置离线模型）：`/api/health` 返回 `"llm":"local"`；4 场压测 `agentFailureRate=0`、`sqliteBusy=0`、单场 P50 891ms；另走一遍「组局 → 发言 → 结束 → 纪要」，`minutes.done` 与 6 段分节全部到达。
 
 演示模式（单进程，交付/录视频用这一条）：
 

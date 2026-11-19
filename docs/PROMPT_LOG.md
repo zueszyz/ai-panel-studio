@@ -412,6 +412,7 @@
 - **验证方式（命令 + 结果）**：
   - `mvn -f server/pom.xml test` → 新增 `OfflineLlmClientTest` / `OfflineFallbackIntegrationTest` 全绿；
   - 未配置 `LLM_BASE_URL` 的 Spring 上下文中 `LlmClient` 返回合法 JSON 与非空流式文本，不再抛 `LLM_NOT_CONFIGURED`。
+  - 零密钥实机验证：`/api/health` → `llm=local`；`ROOMS=4 node scripts/stress.mjs` → `agentFailureRate=0`、`sqliteBusy=0`；手工走完组局 → 发言 → 结束 → 纪要，`event:minutes.done` 与 6 段 `minutes.section` 全部到达。
 - **结论**：项目开箱即可完整演示；内置离线模型不替代生产模型，仅保证零密钥可用。
 
 ---
