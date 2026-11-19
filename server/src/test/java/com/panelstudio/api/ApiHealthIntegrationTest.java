@@ -69,6 +69,7 @@ class ApiHealthIntegrationTest {
                 .andExpect(jsonPath("$.sseConnections").isNumber())
                 .andExpect(jsonPath("$.activeSessions").isNumber())
                 .andExpect(jsonPath("$.firstTokenMs.p50").isNumber())
-                .andExpect(jsonPath("$.agentFailureRate").isNumber());
+                .andExpect(jsonPath("$.agentFailureRate").isNumber())
+                .andExpect(jsonPath("$.sqliteBusy").isNumber());
     }
 }
