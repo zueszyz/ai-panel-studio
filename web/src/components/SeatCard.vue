@@ -52,7 +52,7 @@ const replaced = computed(() => props.seat.status === 'REPLACED_BY_USER')
 
     <footer class="seat__foot">
       <span v-if="mine" class="seat__state">{{ copy.panel.claimed }}</span>
-      <span v-else-if="replaced" class="seat__state">{{ copy.seat.status.REPLACED_BY_USER }}</span>
+      <span v-else-if="replaced" class="seat__state">{{ copy.seat.takenByOther }}</span>
       <span v-else-if="isHost" class="seat__state seat__state--muted">{{ copy.panel.hostHint }}</span>
       <span class="spacer"></span>
       <button

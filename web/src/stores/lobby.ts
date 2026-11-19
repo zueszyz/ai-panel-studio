@@ -5,11 +5,13 @@ import { ApiError } from '@/lib/api'
 import { createDiscussion, deleteDiscussion, fetchDiscussions } from '@/lib/discussions'
 import type { DiscussionSummary } from '@/lib/types'
 
-export type LobbyFilter = 'all' | 'ongoing' | 'mine' | 'ended'
+export type LobbyFilter = 'all' | 'preparing' | 'ongoing' | 'mine' | 'ended'
 
 const statusByFilter: Record<LobbyFilter, string | undefined> = {
   all: undefined,
-  ongoing: 'LIVE,PANEL_READY,SUMMARIZING,INTERRUPTED',
+  // 筹备中包括还没生成席位、以及已生成席位但尚未开场，二者都可加入。
+  preparing: 'DRAFT,PANEL_READY',
+  ongoing: 'LIVE,SUMMARIZING,INTERRUPTED',
   mine: undefined,
   ended: 'CLOSED',
 }

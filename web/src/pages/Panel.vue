@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import EmptyState from '@/components/EmptyState.vue'
 import SeatCard from '@/components/SeatCard.vue'
@@ -7,20 +7,46 @@ import StatusBadge from '@/components/StatusBadge.vue'
 import { copy } from '@/lib/copy'
 import { startDiscussion } from '@/lib/live'
 import { usePanelStore } from '@/stores/panel'
+import type { RoleType } from '@/lib/types'
 
 const props = defineProps<{ id: string }>()
 const panel = usePanelStore()
 const router = useRouter()
 
+const selectedRole = ref<RoleType | null>(null)
+
 const showSkeleton = computed(() => panel.generating && panel.seats.length === 0)
 const claimable = computed(() => panel.status === 'PANEL_READY' || panel.status === 'DRAFT')
 const failure = computed(() => panel.error !== null && panel.seats.length === 0)
+/** 还没生成席位：发起人先选座；其他人等待发起人。 */
+const picking = computed(
+  () => panel.status === 'DRAFT' && panel.seats.length === 0 && !panel.generating,
+)
+const canPick = computed(() => picking.value && panel.createdByMe)
+const waitingForHost = computed(() => picking.value && !panel.createdByMe)
+const roleChoices = computed(() =>
+  copy.panel.roleOptions.slice(0, Math.max(1, Math.min(panel.panelSize - 1, copy.panel.roleOptions.length))),
+)
+const openSeats = computed(
+  () => panel.seats.filter((seat) => seat.roleType !== 'HOST' && seat.status === 'ACTIVE').length,
+)
+const startLabel = computed(() =>
+  panel.status === 'PANEL_READY' ? copy.panel.startNow : copy.panel.enter,
+)
 
 onMounted(() => void panel.init(props.id))
 onBeforeUnmount(() => panel.dispose())
 
+/** 选好席位后生成其余 AI 席位并自动开场；成功后直接进入现场。 */
+async function startWithSeat(role: RoleType | null): Promise<void> {
+  const ok = await panel.startWithSeat(role)
+  if (ok) {
+    await router.push(`/discussions/${props.id}`)
+  }
+}
+
 async function enterDiscussion(): Promise<void> {
-  // 进入圆桌 = 主持人开场：先开场再跳转，现场页直接连流（已开场时后端返回 409，忽略即可）
+  // 已有席位时「开始讨论」= 主持人开场；未认领的席位继续由 AI 担任。
   try {
     await startDiscussion(props.id)
   } catch {
@@ -65,12 +91,84 @@ async function enterDiscussion(): Promise<void> {
             type="button"
             class="btn btn--primary"
             data-testid="enter-discussion"
+            :disabled="panel.starting"
             @click="enterDiscussion"
           >
-            {{ copy.panel.enter }}
+            {{ startLabel }}
           </button>
         </div>
       </header>
+
+      <section v-if="canPick" class="picker card" data-testid="seat-picker">
+        <header class="picker__head">
+          <p class="eyebrow">{{ copy.panel.eyebrow }}</p>
+          <h2 class="picker__title">{{ copy.panel.pickTitle }}</h2>
+          <p class="picker__body">{{ copy.panel.pickBody }}</p>
+        </header>
+
+        <div class="picker__host">
+          <span class="picker__host-tag">{{ copy.seat.roleType.HOST }}</span>
+          <span>{{ copy.panel.pickHost }}</span>
+        </div>
+
+        <div class="picker__roles" role="radiogroup" :aria-label="copy.panel.pickTitle">
+          <button
+            v-for="choice in roleChoices"
+            :key="choice.role"
+            type="button"
+            role="radio"
+            class="picker__role"
+            :class="{ 'picker__role--active': selectedRole === choice.role }"
+            :aria-checked="selectedRole === choice.role"
+            :data-testid="`role-${choice.role}`"
+            @click="selectedRole = choice.role"
+          >
+            <span class="picker__role-title">{{ copy.seat.roleType[choice.role] }}</span>
+            <span class="picker__role-hint">{{ choice.hint }}</span>
+            <span v-if="selectedRole === choice.role" class="picker__role-check">
+              {{ copy.panel.pickSelected }}
+            </span>
+          </button>
+        </div>
+
+        <div class="picker__actions">
+          <button
+            type="button"
+            class="btn btn--primary"
+            data-testid="generate-with-seat"
+            :disabled="!selectedRole || panel.starting"
+            @click="startWithSeat(selectedRole)"
+          >
+            {{ panel.starting ? copy.panel.pickStarting : copy.panel.pickAction }}
+          </button>
+          <button
+            type="button"
+            class="btn"
+            data-testid="generate-all-ai"
+            :disabled="panel.starting || !panel.createdByMe"
+            @click="startWithSeat(null)"
+          >
+            {{ copy.panel.pickAllAi }}
+          </button>
+        </div>
+      </section>
+
+      <div v-if="waitingForHost" class="failure card" data-testid="waiting-for-host">
+        <h2 class="failure__title">{{ copy.panel.pickTitle }}</h2>
+        <p class="failure__body">{{ copy.panel.pickWaiting }}</p>
+        <div class="failure__actions">
+          <button type="button" class="btn" @click="panel.init(props.id)">{{ copy.common.retry }}</button>
+        </div>
+      </div>
+
+      <p
+        v-if="panel.status === 'PANEL_READY' && panel.seats.length > 0"
+        class="banner banner--info"
+        data-testid="start-hint"
+      >
+        <span v-if="openSeats > 0">{{ copy.panel.openSeats(openSeats) }} · </span>
+        {{ panel.createdByMe ? copy.panel.startHint : copy.panel.joiningHint }}
+      </p>
 
       <section v-if="panel.analysis" class="analysis" data-testid="panel-analysis">
         <div class="analysis__goal">
@@ -332,6 +430,104 @@ async function enterDiscussion(): Promise<void> {
   }
   50% {
     opacity: 1;
+  }
+}
+
+/* 选座：主持人固定，专家角色单选；选中后才允许生成其余席位 */
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  margin-bottom: var(--space-5);
+}
+
+.picker__title {
+  font-size: var(--text-xl);
+  margin-top: var(--space-1);
+}
+
+.picker__body {
+  margin-top: var(--space-2);
+  max-width: var(--reading-max);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.picker__host {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.picker__host-tag {
+  flex: none;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.picker__roles {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-2);
+}
+
+.picker__role {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease);
+}
+
+.picker__role:hover {
+  border-color: color-mix(in srgb, var(--primary) 55%, transparent);
+}
+
+.picker__role--active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.picker__role-title {
+  font-weight: 600;
+}
+
+.picker__role-hint {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.picker__role-check {
+  color: var(--primary);
+  font-size: var(--text-xs);
+}
+
+.picker__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+@media (min-width: 768px) {
+  .picker__roles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

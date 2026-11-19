@@ -20,6 +20,7 @@ let searchTimer: ReturnType<typeof setTimeout> | undefined
 
 const filters: { key: LobbyFilter; label: string }[] = [
   { key: 'all', label: copy.lobby.filters.all },
+  { key: 'preparing', label: copy.lobby.filters.preparing },
   { key: 'ongoing', label: copy.lobby.filters.ongoing },
   { key: 'mine', label: copy.lobby.filters.mine },
   { key: 'ended', label: copy.lobby.filters.ended },

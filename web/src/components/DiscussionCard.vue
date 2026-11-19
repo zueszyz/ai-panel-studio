@@ -11,11 +11,16 @@ import type { DiscussionSummary } from '@/lib/types'
 const props = defineProps<{ discussion: DiscussionSummary }>()
 const emit = defineEmits<{ delete: [discussion: DiscussionSummary] }>()
 
-/** 还没有席位时直接去组局页，其余进入圆桌现场。 */
+/** 筹备阶段去组局页（可加入 / 可开始），已开场才进现场。 */
 const target = computed(() =>
-  props.discussion.status === 'DRAFT'
+  props.discussion.status === 'DRAFT' || props.discussion.status === 'PANEL_READY'
     ? `/discussions/${props.discussion.id}/panel`
     : `/discussions/${props.discussion.id}`,
+)
+
+const joinable = computed(() =>
+  (props.discussion.status === 'DRAFT' || props.discussion.status === 'PANEL_READY')
+  && props.discussion.openSeatCount > 0,
 )
 
 const accentStyle = computed(() => ({ '--status-color': statusDotColor(props.discussion.status) }))
@@ -31,6 +36,9 @@ const accentStyle = computed(() => ({ '--status-color': statusDotColor(props.dis
   >
     <header class="discussion__head">
       <StatusBadge :status="discussion.status" />
+      <span v-if="joinable" class="badge badge--accent" data-testid="joinable-badge">
+        {{ copy.lobby.joinable }}
+      </span>
       <span v-if="discussion.turnIndex > 0" class="badge">{{ turnLabel(discussion.turnIndex) }}</span>
       <span class="spacer"></span>
       <time class="discussion__time" :datetime="discussion.updatedAt">
@@ -71,7 +79,10 @@ const accentStyle = computed(() => ({ '--status-color': statusDotColor(props.dis
             :muted="seat.status === 'RETIRED'"
             size="sm"
           />
-          <span class="discussion__count">{{ copy.lobby.seatCount(discussion.seats.length) }}</span>
+          <span class="discussion__count">
+            {{ joinable ? copy.lobby.openSeats(discussion.openSeatCount)
+              : copy.lobby.seatCount(discussion.seats.length) }}
+          </span>
         </div>
         <span class="discussion__go" aria-hidden="true">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">

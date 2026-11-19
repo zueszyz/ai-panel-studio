@@ -46,6 +46,8 @@ export interface DiscussionSummary {
   panelSize: number
   turnIndex: number
   seats: SeatSummary[]
+  /** 开场前仍可被参与者接手的专家席位数 */
+  openSeatCount: number
   lastMessage: LastMessage | null
   updatedAt: string
 }
@@ -237,6 +239,16 @@ export interface MinuteNextStep {
   proposedBy: string
 }
 
+export interface MinuteMeta {
+  rounds: number
+  seatCount: number
+  messageCount: number
+  durationSec: number
+  generatedAt: string
+  participants: string[]
+  userQuestions: string[]
+}
+
 export interface MinuteStructured {
   topic?: string
   goal?: string
@@ -245,6 +257,8 @@ export interface MinuteStructured {
   consensus?: string[]
   hypotheses?: string[]
   nextSteps?: MinuteNextStep[]
+  /** 参会信息、时长与用户关切：由服务端按本场数据补齐，非模型生成 */
+  meta?: MinuteMeta
   fallback?: string
 }
 

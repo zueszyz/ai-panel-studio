@@ -10,7 +10,7 @@ const emit = defineEmits<{ close: []; created: [id: string] }>()
 
 const lobby = useLobbyStore()
 const topic = ref('')
-const panelSize = ref(4)
+const panelSize = ref(5)
 const submitting = ref(false)
 const error = ref<string | null>(null)
 
@@ -25,7 +25,7 @@ watch(
   (open) => {
     if (open) {
       topic.value = ''
-      panelSize.value = 4
+      panelSize.value = 5
       error.value = null
       submitting.value = false
     }
