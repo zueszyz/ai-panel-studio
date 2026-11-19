@@ -1,3 +1,5 @@
+e0f0137 2026-11-19 docs: correct remaining stale test counts
+f7903aa 2026-11-19 docs: sync 72-test counts, I-case references and history export
 188921c 2026-11-19 test(server): wait for the full panel.failed data frame
 8494510 2026-11-19 fix(server): surface upstream rate limiting on the top banner
 421588a 2026-11-19 test(server): cover token budget thresholds (I-10)
