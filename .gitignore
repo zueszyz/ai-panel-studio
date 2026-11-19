@@ -29,6 +29,8 @@ coverage/
 playwright-report/
 test-results/
 .playwright/
+# E2E 运行时目录（临时库、服务日志）
+e2e/.tmp/
 
 # editor / os
 .vscode/
