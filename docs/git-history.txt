@@ -1,3 +1,5 @@
+7dc60b5 2026-11-19 docs(prd): default to five seats with a user-picked expert role
+6b5c1cc 2026-11-19 docs: refresh git history export after seat-flow changes
 813793c 2026-11-19 docs: document the five-seat flow, claim window and minutes facts
 4c279d4 2026-11-19 test: cover seat reservation, human seats and minutes facts
 8db3aa2 2026-11-19 feat(minutes): add participant facts, export and auto-generate on end
