@@ -28,9 +28,10 @@ public class MinutesController {
      * 不声明 produces：状态不允许（409）时仍要能协商回 application/json（同 PanelController）。
      */
     @PostMapping
-    @Operation(summary = "生成纪要（六段分节流式推送）")
-    public SseEmitter generate(@PathVariable String id) {
-        return minutesService.generate(id);
+    @Operation(summary = "生成纪要（六段分节流式推送；interim=true 为不入库的阶段性小结）")
+    public SseEmitter generate(@PathVariable String id,
+                               @RequestParam(value = "interim", defaultValue = "false") boolean interim) {
+        return minutesService.generate(id, interim);
     }
 
     @GetMapping

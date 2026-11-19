@@ -118,28 +118,32 @@ public class MinutesService {
 
     // ── 生成（SSE） ──────────────────────────────────────────
 
-    public SseEmitter generate(String discussionId) {
+    public SseEmitter generate(String discussionId, boolean interim) {
         DiscussionEntity discussion = discussionService.requireDiscussion(discussionId);
-        requireSummarizable(discussion);
+        requireSummarizable(discussion, interim);
         SseEmitter emitter = new SseEmitter(0L);
-        agentExecutor.execute(() -> run(emitter, discussion));
+        agentExecutor.execute(() -> run(emitter, discussion, interim));
         return emitter;
     }
 
-    private void requireSummarizable(DiscussionEntity discussion) {
+    private void requireSummarizable(DiscussionEntity discussion, boolean interim) {
         DiscussionStatus status = discussion.getStatus();
-        // 未结束的讨论只能出"阶段性小结"，正式纪要先结束讨论（PRD FR-7）
+        // 阶段性小结（PRD FR-7）：讨论中也能看，但不入库、不占版本、不收敛状态。
+        if (interim) {
+            return;
+        }
+        // 正式纪要先结束讨论；DRAFT/PANEL_READY/FAILED 没有可整理的内容。
         if (status == DiscussionStatus.LIVE
                 || status == DiscussionStatus.DRAFT
                 || status == DiscussionStatus.PANEL_READY
                 || status == DiscussionStatus.FAILED) {
             throw new ApiException(HttpStatus.CONFLICT, "DISCUSSION_STATE_INVALID",
-                    "讨论还没结束，先结束讨论再生成纪要",
+                    "讨论还没结束，先结束讨论再生成纪要；也可以生成阶段性小结",
                     Map.of("from", status.name(), "to", DiscussionStatus.CLOSED.name()));
         }
     }
 
-    private void run(SseEmitter emitter, DiscussionEntity discussion) {
+    private void run(SseEmitter emitter, DiscussionEntity discussion, boolean interim) {
         String discussionId = discussion.getId();
         try {
             List<AgentEntity> seats = agentMapper.findByDiscussionId(discussionId);
@@ -160,7 +164,7 @@ public class MinutesService {
 
             // 第一段不依赖模型：先把"议题与目标"推出去，避免用户对着空白等待（首帧 < 1s）
             String topicMd = sectionMd("topic", topic + "\n\n" + (goal == null || goal.isBlank() ? "" : goal));
-            send(emitter, "minutes.section", new SectionEvent("topic", 0, topicMd));
+            send(emitter, "minutes.section", new SectionEvent("topic", 0, topicMd, interim));
 
             boolean local = !properties.getLlm().isConfigured();
             ObjectNode structured;
@@ -180,21 +184,36 @@ public class MinutesService {
             Map<String, AgentEntity> seatById = seats.stream()
                     .collect(Collectors.toMap(AgentEntity::getId, seat -> seat, (left, right) -> left));
             Map<String, String> sections = renderSections(structured, seatById);
-            MinuteEntity saved = persist(discussionId, topic, structured, sections, model, tokens);
+
+            // 阶段性小结不落库：id 仅用于前端定位，version 沿用当前已落库版本（没有则为 0）。
+            String minuteId;
+            int version;
+            if (interim) {
+                minuteId = idGenerator.nextWithPrefix(IdPrefixes.MINUTE);
+                Integer latest = latestVersion(discussionId);
+                version = latest == null ? 0 : latest;
+            } else {
+                MinuteEntity saved = persist(discussionId, topic, structured, sections, model, tokens);
+                minuteId = saved.getId();
+                version = saved.getVersion();
+            }
 
             int index = 1;
             for (String key : SECTION_ORDER) {
                 if ("topic".equals(key)) {
                     continue;
                 }
-                send(emitter, "minutes.section", new SectionEvent(key, index, sections.get(key)));
+                send(emitter, "minutes.section", new SectionEvent(key, index, sections.get(key), interim));
                 index++;
             }
-            send(emitter, "minutes.done", new DoneEvent(saved.getId(), saved.getVersion(), tokens,
-                    local ? "LOCAL" : null));
-            closeOnSuccess(discussionId);
+            send(emitter, "minutes.done", new DoneEvent(minuteId, version, tokens,
+                    local ? "LOCAL" : null, interim));
+            if (!interim) {
+                closeOnSuccess(discussionId);
+            }
             emitter.complete();
-            log.info("minutes.done discussionId={} version={} local={}", discussionId, saved.getVersion(), local);
+            log.info("minutes.done discussionId={} version={} local={} interim={}",
+                    discussionId, version, local, interim);
         } catch (ClientGoneException ex) {
             log.debug("纪要流客户端已断开 discussionId={}", discussionId);
             emitter.complete();

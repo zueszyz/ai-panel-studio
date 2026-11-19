@@ -164,6 +164,30 @@ class MinutesApiIntegrationTest {
                 .andExpect(jsonPath("$.error.code").value("DISCUSSION_STATE_INVALID"));
     }
 
+    @Test
+    @DisplayName("FR-7 阶段性小结：讨论中可流式生成，但不落库、不占版本、不结束讨论")
+    void shouldGenerateInterimSummaryWithoutPersisting() throws Exception {
+        String discussionId = createLiveDiscussion();
+
+        mockMvc.perform(post("/api/discussions/" + discussionId + "/minutes")
+                        .accept(MediaType.TEXT_EVENT_STREAM, MediaType.APPLICATION_JSON))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("DISCUSSION_STATE_INVALID"));
+
+        String stream = generateMinutes(discussionId, "event:minutes.done", true);
+        assertThat(stream)
+                .contains("event:minutes.section")
+                .contains("event:minutes.done")
+                .contains("\"interim\":true");
+
+        mockMvc.perform(get("/api/discussions/" + discussionId + "/minutes"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("MINUTES_NOT_FOUND"));
+        mockMvc.perform(get("/api/discussions/" + discussionId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("LIVE"));
+    }
+
     // ── 辅助 ────────────────────────────────────────────────
 
     private void stubJson(String marker, String content, int priority) {
@@ -243,8 +267,8 @@ class MinutesApiIntegrationTest {
         return objectMapper.readTree(created.getResponse().getContentAsString()).path("id").asText();
     }
 
-    /** 建一场已经结束的讨论：席位已就绪 + 至少一条主持人发言。 */
-    private String createEndedDiscussion() throws Exception {
+    /** 建一场已经开场的讨论：席位已就绪 + 至少一条主持人发言。 */
+    private String createLiveDiscussion() throws Exception {
         String discussionId = createDraft();
         MvcResult panel = mockMvc.perform(post("/api/discussions/" + discussionId + "/panel")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -262,13 +286,22 @@ class MinutesApiIntegrationTest {
         assertThat(awaitStream(stream, "event:message.end", 20_000))
                 .withFailMessage("开场发言没完成")
                 .contains("event:message.end");
+        return discussionId;
+    }
 
+    private String createEndedDiscussion() throws Exception {
+        String discussionId = createLiveDiscussion();
         mockMvc.perform(post("/api/discussions/" + discussionId + "/end")).andExpect(status().isOk());
         return discussionId;
     }
 
     private String generateMinutes(String discussionId, String doneMarker) throws Exception {
+        return generateMinutes(discussionId, doneMarker, false);
+    }
+
+    private String generateMinutes(String discussionId, String doneMarker, boolean interim) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/discussions/" + discussionId + "/minutes")
+                        .param("interim", String.valueOf(interim))
                         .accept(MediaType.TEXT_EVENT_STREAM, MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andReturn();

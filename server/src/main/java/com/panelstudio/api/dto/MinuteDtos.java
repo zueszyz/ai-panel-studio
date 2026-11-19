@@ -11,10 +11,10 @@ public final class MinuteDtos {
     }
 
     /** 分节到达：前端先把已到达的段落渲染出来，不等全文。 */
-    public record SectionEvent(String key, int index, String md) {
+    public record SectionEvent(String key, int index, String md, boolean interim) {
     }
 
-    public record DoneEvent(String id, int version, int tokensUsed, String fallback) {
+    public record DoneEvent(String id, int version, int tokensUsed, String fallback, boolean interim) {
     }
 
     /** 失败不覆盖旧版本：keptVersion 告诉前端仍可查看哪一版。 */
