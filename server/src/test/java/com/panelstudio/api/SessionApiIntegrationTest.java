@@ -318,7 +318,27 @@ class SessionApiIntegrationTest {
     @Test
     @DisplayName("FR-9 单条重试：失败的发言沿用同一 messageId 重新生成，卡片可回到 DONE")
     void shouldRetryFailedMessage() throws Exception {
-        // 第一次给陈立返回 500，第二次（重试）返回正常流
+        String discussionId = createLiveReadyPanel(TOPIC_A);
+        mockMvc.perform(post("/api/discussions/" + discussionId + "/start")).andExpect(status().isOk());
+
+        // 开场会自动跑一轮，陈立可能已经发过言；故障桩必须等自动轮收尾后再注册，
+        // 否则第一次 500 会被自动轮消费掉，重试用例拿不到失败轨迹。
+        long settleDeadline = System.currentTimeMillis() + 20_000;
+        while (System.currentTimeMillis() < settleDeadline) {
+            JsonNode items = objectMapper.readTree(mockMvc.perform(get("/api/discussions/" + discussionId + "/runs"))
+                    .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8)).path("items");
+            int done = 0;
+            for (JsonNode run : items) {
+                if ("DONE".equals(run.path("phase").asText())
+                        && "SPEECH".equals(run.path("meta").path("kind").asText())) {
+                    done++;
+                }
+            }
+            if (done >= 3) {
+                break;
+            }
+            Thread.sleep(50);
+        }
         WIRE_MOCK.stubFor(WireMock.post(urlEqualTo("/v1/chat/completions"))
                 .atPriority(1)
                 .inScenario("retry-chenli")
@@ -336,9 +356,6 @@ class SessionApiIntegrationTest {
                         .withHeader("Content-Type", MediaType.TEXT_EVENT_STREAM_VALUE)
                         .withBody(sseBody("重试之后，我给的结论是先设三周判断点。", 5))
                         .withChunkedDribbleDelay(5, 200)));
-
-        String discussionId = createLiveReadyPanel(TOPIC_A);
-        mockMvc.perform(post("/api/discussions/" + discussionId + "/start")).andExpect(status().isOk());
 
         mockMvc.perform(post("/api/discussions/" + discussionId + "/messages")
                         .header("X-Device-Id", "device-a")
