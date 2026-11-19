@@ -115,6 +115,7 @@ async function enterDiscussion(): Promise<void> {
       <div v-if="failure" class="failure card">
         <h2 class="failure__title">{{ copy.panel.failedTitle }}</h2>
         <p class="failure__body">{{ panel.error }}</p>
+        <p v-if="panel.fallbackAvailable" class="failure__body muted">{{ copy.panel.presetHint }}</p>
         <div class="failure__actions">
           <button type="button" class="btn" @click="panel.retry()">{{ copy.panel.failedRetry }}</button>
           <button
