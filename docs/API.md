@@ -410,6 +410,7 @@ sse.on('message.delta', ({ messageId, seq, text }) => {
 | 503 | `LLM_NOT_CONFIGURED` | 后端未配置 `LLM_API_KEY` / `LLM_BASE_URL` / `LLM_MODEL`，需走预设阵容 | 否（用 preset） |
 | 409 | `DISCUSSION_STATE_INVALID` | 状态机拒绝的迁移（附带 `from` / `to`） | 否 |
 | 500 | `INTERNAL_ERROR` | 未预期异常（不回传堆栈与上游响应体） | 是（稍后） |
+| SSE | `DB_WRITE_FAILED` | 消息终态落库失败（重试耗尽）：`message.failed` 携带该 code，前端提示「本条可能未保存」 | 是（单条重试） |
 
 统一错误体：
 
