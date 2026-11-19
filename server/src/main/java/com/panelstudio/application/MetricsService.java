@@ -23,6 +23,8 @@ public class MetricsService {
     private final Queue<Long> firstTokenSamples = new ConcurrentLinkedQueue<>();
     private final LongAdder agentCalls = new LongAdder();
     private final LongAdder agentFailures = new LongAdder();
+    /** SQLite 写锁冲突后由应用层退避重试消化的次数（ARCHITECTURE §3.8）。 */
+    private final LongAdder sqliteBusy = new LongAdder();
 
     public void sseConnected() {
         sseConnections.incrementAndGet();
@@ -59,6 +61,10 @@ public class MetricsService {
         agentFailures.increment();
     }
 
+    public void sqliteBusy() {
+        sqliteBusy.increment();
+    }
+
     public Snapshot snapshot() {
         List<Long> samples = new ArrayList<>(firstTokenSamples);
         samples.sort(Long::compareTo);
@@ -66,7 +72,8 @@ public class MetricsService {
                 sseConnections.get(),
                 activeSessions.get(),
                 new Latency(percentile(samples, 0.50), percentile(samples, 0.95)),
-                agentCalls.sum() == 0 ? 0d : round(agentFailures.doubleValue() / agentCalls.sum()));
+                agentCalls.sum() == 0 ? 0d : round(agentFailures.doubleValue() / agentCalls.sum()),
+                sqliteBusy.sum());
     }
 
     private static long percentile(List<Long> sorted, double p) {
@@ -84,6 +91,7 @@ public class MetricsService {
     public record Latency(long p50, long p95) {
     }
 
-    public record Snapshot(int sseConnections, int activeSessions, Latency firstTokenMs, double agentFailureRate) {
+    public record Snapshot(int sseConnections, int activeSessions, Latency firstTokenMs,
+                           double agentFailureRate, long sqliteBusy) {
     }
 }
