@@ -1,3 +1,7 @@
+c108b50 2026-11-20 docs: document the minutes completion status and log the fix
+8c93996 2026-11-20 fix(web): clear the minutes generating state when the stream ends
+beb9c65 2026-11-20 fix(server): converge the discussion before emitting minutes.done
+6446b4f 2026-11-19 docs: refresh git history export after PRD update
 7dc60b5 2026-11-19 docs(prd): default to five seats with a user-picked expert role
 6b5c1cc 2026-11-19 docs: refresh git history export after seat-flow changes
 813793c 2026-11-19 docs: document the five-seat flow, claim window and minutes facts
