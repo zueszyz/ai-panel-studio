@@ -1,3 +1,6 @@
+cb54a9d 2026-11-20 docs(screenshots): refresh product screenshots for seat picking and minutes facts
+4bb339a 2026-11-20 docs: sync the plan and related docs with the current implementation
+62066cb 2026-11-20 docs: refresh git history export after minutes status fix
 c108b50 2026-11-20 docs: document the minutes completion status and log the fix
 8c93996 2026-11-20 fix(web): clear the minutes generating state when the stream ends
 beb9c65 2026-11-20 fix(server): converge the discussion before emitting minutes.done
