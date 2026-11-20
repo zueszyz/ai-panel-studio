@@ -34,7 +34,7 @@
 | M2 组局 | 1（R-016） | `[ai-gen+edit]` | LlmClient、逐席流式生成、预设兜底、认领 |
 | M3 讨论 | 1（R-026 补录）+ R-019 验证 | `[ai-gen+edit]` | SessionActor/Registry、SpeakerPolicy、并行 fan-out、SseRegistry、插话死线、人类席位跳过、轨迹/引用定位 |
 | M4 收敛 | 3（R-017 / R-023 / R-024） | `[ai-gen+edit]` | 六段纪要、版本化、失败不覆盖、`structured.meta`、完成态收敛、下载 Markdown |
-| M5 质量 | 6（R-018 / R-019 / R-021 / R-022 / R-025 / R-027） | `[ai-gen+edit]` | 84 例后端、5 条 E2E、20 场压测、离线模型、截图、单 jar 与交付核查 |
+| M5 质量 | 7（R-018 / R-019 / R-021 / R-022 / R-025 / R-027 / R-028） | `[ai-gen+edit]` | 84 例后端、5 条 E2E、20 场压测、离线模型、截图、单 jar、交付核查与 GitHub 上传 |
 
 > M3~M5 的最终口径以 R-026 与 §4/§5 为准；R-017 / R-019 中的 57 例、35s 等是当时快照，保留用于回溯，不再代表当前测试规模。
 
@@ -534,6 +534,27 @@
   2. 交付核查只记录可复现命令，不把仓库授权、zip 抽检等人工动作标为完成；
   3. 列表首屏 20 场并发约 1.26s 作为已知压力限制保留，不篡改目标值。
 - **结论**：PRD / 交付文档与当前实现同口径；代码、测试、单 jar、初始化脚本、OpenAPI、截图均通过核查，剩余人工动作 2 项。
+
+---
+
+### R-028 · GitHub 上传与交付包生成（2026-11-20 10:17–10:25）
+
+- **阶段**：M5 质量 / 交付执行。
+- **目标**：把项目上传到 GitHub（无对应仓库则创建），按交付包结构生成压缩归档并抽检。
+- **Prompt（摘要）**：> 将整个项目上传到 GitHub；若没有对应仓库则创建；上传完毕后整理并压缩交付内容。
+- **产出**：
+  - 仓库 `https://github.com/zueszyz/ai-panel-studio`（public，默认分支 `main`），本地 135+ 次提交全部推送，`origin/main` 与工作区同步；
+  - 交付包 `D:\rep\delivery\AI圆桌演播厅.zip`（约 8.11 MB，1614 条目），含 `.git` 历史、全部源码/文档/测试/截图。
+- **工具调用记录**：
+  - `gh repo create ai-panel-studio --public --source=. --remote=origin --push`；
+  - `git ls-files` 收集受控文件 + Python `zipfile` 写入归档；
+  - `zipfile.testzip()` 与清单抽检验证完整性及排除项。
+- **验证方式（命令 + 结果）**：
+  - `git status --short --branch` → `## main...origin/main`，无未提交改动（仅 `?? .workbuddy/` 未纳入交付）；
+  - `gh repo view` → 仓库可访问、公开、默认分支 `main`；
+  - zip 完整性检查 `bad_file=None`；关键文件（README、PRD、DELIVERY、git-history、build.sh、13 张截图）齐全；
+  - 排除项抽检：`node_modules/`、`target/`、`data/`、`.workbuddy/`、`.idea/`、`e2e/.tmp/`、数据库与日志均未进入归档（`.env.example` 为模板，按交付结构保留）。
+- **结论**：源码与历史已上云，交付压缩就位，评审可直接访问仓库链接查看完整提交演进。
 
 ---
 

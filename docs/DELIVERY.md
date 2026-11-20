@@ -14,7 +14,7 @@
 
 | # | 原文要点 | 本项目的做法 | 证据 |
 | --- | --- | --- | --- |
-| 1 | **禁止"一键生成"**：严禁用单一 Prompt 直接生成整个项目代码，必须体现工程化拆解 | 按"文档 → 骨架 → 组局 → 讨论 → 收敛 → 质量"六段推进，每段独立 Prompt + 人工评审；27 段 Prompt 记录（R-001~R-027）与 30 条走偏修正（F-1~F-30）留痕 | [PROMPT_LOG](PROMPT_LOG.md) |
+| 1 | **禁止"一键生成"**：严禁用单一 Prompt 直接生成整个项目代码，必须体现工程化拆解 | 按"文档 → 骨架 → 组局 → 讨论 → 收敛 → 质量"六段推进，每段独立 Prompt + 人工评审；28 段 Prompt 记录（R-001~R-028）与 30 条走偏修正（F-1~F-30）留痕 | [PROMPT_LOG](PROMPT_LOG.md) |
 | 2 | **技术栈**：数据库采用 SQLite；前端及后端框架不限 | SQLite 3.40（WAL）+ MyBatis-Plus + Flyway；Spring Boot 3.5.16 / JDK 17；Vue 3.4（SFC + 原生 CSS） | README §3、[DATABASE](DATABASE.md) |
 | 3 | **原创性**：必须从 0 到 1 创建 | 仓库从空目录初始化，未套用脚手架模板；接口、组件与样式均由项目自行组织 | `git log` 首条为 `chore: init repo` |
 | 4 | **工具限制**：主体开发必须使用某一款 Vibe Coding 工具，不能使用浏览器与 AI 的对话 | 全程在 CodeBuddy（终端/IDE 内 Agent）完成；无网页版对话产物 | PROMPT_LOG §7 工具调用记录 |
@@ -45,7 +45,7 @@
 | **DDD 阶段**：前端组件与页面生成 | R-012（中文 UI 与界面规范）、PRD §8 |
 | **TDD 阶段**：核心逻辑测试用例编写与业务实现 | R-006（E2E/集成用例设计）、TESTING §4（单测清单先于实现） |
 | **E2E 阶段**：端到端测试与质量闭环 | TESTING §2（5 条 E2E）、§7 交付前自检 |
-| **M3~M5 收口** | R-023（五席位/纪要增强）、R-024（完成态）、R-025（文档同步）、R-026（M3~M5 留痕）、R-027（交付核查） |
+| **M3~M5 收口** | R-023（五席位/纪要增强）、R-024（完成态）、R-025（文档同步）、R-026（M3~M5 留痕）、R-027（交付核查）、R-028（GitHub 上传与打包） |
 | 每段 Prompt 后 1–2 句说明（当时意图 / 遇到的挑战 / 如何引导修正） | 每条记录的「目标 + 人工干预 + 结论」三行即为该说明；四范式归组表见 PROMPT_LOG §4.1 |
 
 ### 2.3 开发过程思路 & 工作流程说明（1–1.5 页）
@@ -85,7 +85,7 @@ zip -r ai-panel-studio.zip . -x "*/node_modules/*" "*/target/*" "data/*"
 ```
 
 - 仓库需给评审开通访问（GitHub/Gitee 邀请链接）；压缩包仅作备份，**以仓库为准**。
-- 压缩包命名：`AI圆桌演播厅-姓名.zip`。
+- 压缩包命名模板：`AI圆桌演播厅-姓名.zip`；本次实际产出：`D:\rep\delivery\AI圆桌演播厅.zip`（约 8.11 MB，含 `.git` 历史）。
 
 ---
 
@@ -116,13 +116,13 @@ zip -r ai-panel-studio.zip . -x "*/node_modules/*" "*/target/*" "data/*"
 - [x] 删 `data/panel-studio.db` 重启能自动建库 + 6 场样例数据（本次核查：Flyway V1~V5 全部成功，7 张业务表，6 场 discussion）
 - [x] `/swagger-ui.html` 可访问，endpoint 数量与 API.md 一致（本次核查：OpenAPI 15 条 path / 19 个 operation；Swagger 302 跳转正常）
 - [x] 4 个核心页面截图入 `docs/screenshots/` 并嵌入 README §2.2（本次核查：13 张文件，含选座页与桌面/窄屏）
-- [x] PROMPT_LOG 覆盖四范式，且每段有"意图/挑战/修正"（R-001~R-027）
+- [x] PROMPT_LOG 覆盖四范式，且每段有"意图/挑战/修正"（R-001~R-028）
 - [x] `AGENTS.md` + `rules/`（6 份）随仓库交付，且与实现一致（约束不是摆设）
 - [x] WORKFLOW.md 1–1.5 页，含 3 个典型问题与效率台账
 - [x] README「已完成能力 / 后续改进方向」两节齐全
 - [x] `git log` 呈层级（docs → feat(db) → feat(server) → feat(web) → test），message 可读
-- [ ] 仓库已邀请评审（人工动作，需在提交平台完成）
-- [ ] zip 不含 `node_modules/` `target/` `data/`（打包时按 §3 命令执行并抽检）
+- [x] 仓库已公开可访问：`https://github.com/zueszyz/ai-panel-studio`（提交平台无需邀请）
+- [x] zip 不含 `node_modules/` `target/` `data/`（已生成 `AI圆桌演播厅.zip`，`zipfile.testzip()` 通过并抽检排除项）
 
 
 ---
@@ -140,4 +140,9 @@ zip -r ai-panel-studio.zip . -x "*/node_modules/*" "*/target/*" "data/*"
 | 7 | 截图 | `docs/screenshots/` | 13 张文件；4 个核心页面 + 选座页；四档断点无横向溢出 |
 | 8 | 文档一致性 | `grep` 检索旧口径与提交联系信息 | 无已下线的交付项或旧版口径残留；9 份 md + 6 份 rules |
 
-**结论**：代码、测试、单 jar、初始化脚本、OpenAPI、截图与文档均通过本轮交付核查。剩余人工动作只有两项：提交平台上的仓库访问授权，以及最终 zip 打包后的排除项抽检。
+
+| 9 | GitHub 上传 | `gh repo create ... --source=. --remote=origin --push` | 仓库 `https://github.com/zueszyz/ai-panel-studio` 已创建，135+ 次提交全部推送，`main...origin/main` 同步 |
+| 10 | 交付包 | Python `zipfile` 打包 + 完整性抽检 | `D:\rep\delivery\AI圆桌演播厅.zip`，8.11 MB / 1614 条目，关键文件齐全，排除项抽检通过 |
+
+
+**结论**：代码、测试、单 jar、初始化脚本、OpenAPI、截图、文档、GitHub 仓库与交付 zip 均已完成核查。仓库为 public，无需单独邀请；两项原定人工动作（仓库授权、zip 抽检）已由公开链接与归档抽检关闭。

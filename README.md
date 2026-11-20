@@ -270,6 +270,7 @@ java -jar server/target/panel-studio.jar  # http://localhost:8080
 
 ## 9. 交付
 
+- 仓库地址：`https://github.com/zueszyz/ai-panel-studio`（public，`main` 分支含完整提交历史）。
 - 必交清单（11 项）逐条对照、压缩包结构、**评分维度自检**：见 [docs/DELIVERY.md](docs/DELIVERY.md)。
 
 ## 10. License
