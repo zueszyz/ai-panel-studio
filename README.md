@@ -146,7 +146,7 @@ ai-panel-studio/
 │   ├── TESTING.md                 # E2E 用例与验收清单
 │   ├── PROJECT_PLAN.md            # 里程碑 + commit 规划
 │   ├── PROMPT_LOG.md              # Prompt / 工具调用留痕
-│   └── DELIVERY.md                # 交付清单 / 打包 / 视频分镜 / 提交模板
+│   └── DELIVERY.md                # 交付清单 / 打包 / 提交模板
 ├── server/                        # Spring Boot 3 · JDK 17 · Maven
 │   ├── pom.xml
 │   └── src/main/
@@ -224,7 +224,7 @@ metrics: {"sseConnections":0,"activeSessions":20,"firstTokenMs":{"p50":59,"p95":
 
 > 零密钥验证（未配 `LLM_*`，内置离线模型）：`/api/health` 返回 `"llm":"local"`；4 场压测 `agentFailureRate=0`、`sqliteBusy=0`、单场 P50 891ms；另走一遍「组局 → 发言 → 结束 → 纪要」，`minutes.done` 与 6 段分节全部到达。
 
-演示模式（单进程，交付/录视频用这一条）：
+演示模式（单进程，交付验收用这一条）：
 
 ```bash
 ./scripts/build.sh          # 构建 web/dist → 复制到 server 静态目录 → mvn package
@@ -247,7 +247,7 @@ java -jar server/target/panel-studio.jar  # http://localhost:8080
 | [计划](docs/PROJECT_PLAN.md) | 里程碑、WBS、30+ commit 切分方案 |
 | [留痕](docs/PROMPT_LOG.md) | Prompt 记录、关键决策、AI 生成 / 人工修改边界 |
 | [工作流程](docs/WORKFLOW.md) | 六段开发流程、工具与权限边界、3 个典型问题、效率台账 |
-| [交付](docs/DELIVERY.md) | 11 项硬性要求逐条对照、打包结构、视频分镜、邮件模板、评分自检 |
+| [交付](docs/DELIVERY.md) | 11 项硬性要求逐条对照、打包结构、邮件模板、评分自检 |
 
 ## 7. AI 工具使用说明
 
@@ -266,12 +266,12 @@ java -jar server/target/panel-studio.jar  # http://localhost:8080
 | 后端语言 | 推荐 Node.js + TypeScript | **Spring Boot 3.5.16 + JDK 17** | 推荐非强制；三个考核点与语言无关，JDK 17 无虚拟线程反而更能体现并发调度的工程判断 |
 | 数据库 | 未指定 | **SQLite 3.40+（WAL）** | 单文件、零运维、随包复现；单写者代价见 [DATABASE](docs/DATABASE.md) §1.2 |
 | 启动方式 | 提到 "Docker Compose 一键起来" | **本地脚本 + 单个 jar**（按项目约定不用容器） | 无独立 DB 服务可编排；少一层代理少一个流式坑 |
-| 数量要求 | ≥5 表 / ≥8 API / ≥3 路由 / ≥3 E2E | 7 表 / 17 API / 4 路由 / 5 E2E | 只多不少，且每条需求带验收标准（PRD FR-1~FR-9） |
+| 数量要求 | ≥5 表 / ≥8 API / ≥3 路由 / ≥3 E2E | 7 表 / 19 API / 4 路由 / 5 E2E | 只多不少，且每条需求带验收标准（PRD FR-1~FR-9） |
 
 ## 9. 交付与提交
 
-- 必交清单（11 项）逐条对照、压缩包结构、**演示视频分镜**、提交邮件模板、**评分维度自检**：见 [docs/DELIVERY.md](docs/DELIVERY.md)。
-- 提交邮箱 `handshake@gaodun.cn`，主题 `【AI开发实习生-姓名-岗位】`，附件含简历 + 作品链接 + 视频链接；截止 72 小时。
+- 必交清单（11 项）逐条对照、压缩包结构、提交邮件模板、**评分维度自检**：见 [docs/DELIVERY.md](docs/DELIVERY.md)。
+- 提交邮箱 `handshake@gaodun.cn`，主题 `【AI开发实习生-姓名-岗位】`，附件含简历 + 作品链接；截止 72 小时。
 - 打包前导出提交历史：`git log --pretty=format:'%h %ad %s' --date=short > docs/git-history.txt`。
 
 ## 10. License

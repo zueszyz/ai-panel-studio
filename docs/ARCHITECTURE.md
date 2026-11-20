@@ -433,7 +433,7 @@ flowchart LR
 2. 把 `web/dist` 复制到 `server/src/main/resources/static/`（Vue Router 用 hash 模式或配置 `forward:/index.html` 兜底，避免刷新 404）；
 3. `mvn -f server/pom.xml clean package` → `server/target/panel-studio.jar`。
 
-之后 `java -jar server/target/panel-studio.jar` 单进程跑完整应用 —— 演示视频与交付验收只需要这一个命令。
+之后 `java -jar server/target/panel-studio.jar` 单进程跑完整应用 —— 交付验收只需要这一个命令。
 
 ### 6.3 环境变量与数据
 

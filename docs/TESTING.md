@@ -182,4 +182,3 @@ pnpm -C e2e test
 - [ ] `/swagger-ui.html` 可访问，接口数量与 [API](API.md) §1 一致（19 个）
 - [ ] `git log --oneline | wc -l` ≥ 30，且 `docs/git-history.txt` 已导出
 - [ ] 压缩包不包含 `node_modules/`、`server/target/`、`data/`
-- [ ] 录屏用的场景 = E2E-2（两路并行流式），确保视频里能看到"不阻塞"
