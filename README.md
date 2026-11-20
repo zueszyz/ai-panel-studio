@@ -20,12 +20,12 @@
 | 能力 | 说明 |
 | --- | --- |
 | 圆桌大厅 | 正在进行的讨论列表，可旁观、可加入、可发起新议题 |
-| 专家生成 | 根据议题实时生成 1 位主持人 + N 位专家，带角色立场与发言风格，流式呈现 |
-| 认领席位 | 用户可认领某位专家席位（替换其发言权）或纯旁观 |
+| 专家生成 | 默认 1 位主持人 + 4 位专家；用户先选一个专家席位，其余席位由 AI 生成，带角色立场与发言风格，流式呈现 |
+| 选座与认领 | 生成前选一个专家席位；其他用户可在开场前认领专家席位；开场后禁止换座，未认领席位由 AI 担任 |
 | 多轮自由讨论 | 不设轮次上限，主持人开场/串联，专家并行发言，用户随时插话 |
 | Agent 行动轨迹 | 实时时间线：谁在思考、谁在发言、谁在等谁，技术细节可折叠 |
 | 观点溯源 | 每条观点标注「发言者 + 轮次 + 时间」，可跳回上下文 |
-| 会议纪要 | 讨论结束后按角色结构化输出，含分歧点与待验证假设，JSON 落库可复盘 |
+| 会议纪要 | 讨论结束后按角色结构化输出，含分歧点、待验证假设、参会席位与用户关切；JSON 落库可复盘，支持下载 Markdown |
 | 全程流式 | 单条 SSE 连接多路复用，多 Agent 并行输出互不阻塞，单个 Agent 失败不拖垮全场 |
 
 ### 2.1 多 Agent 是怎么协作的
@@ -44,7 +44,7 @@
 | 页面 | 路由 | 截图 |
 | --- | --- | --- |
 | 圆桌大厅 | `/` | `01-lobby.png`（桌面）、`01-lobby-mobile.png`（390）、`01-lobby-empty.png`（空态）、`01-lobby-wide.png`（1920）、`01-lobby-tablet.png`（1024） |
-| 组局（席位生成） | `/discussions/:id/panel` | `02-panel.png`、`02-panel-mobile.png` |
+| 组局（选座 + 席位生成） | `/discussions/:id/panel` | `02-panel-picker.png`、`02-panel.png`、`02-panel-mobile.png` |
 | 圆桌现场 | `/discussions/:id` | `03-live.png`（三栏）、`03-live-mobile.png`（单栏 + 席位横滑） |
 | 会议纪要 | `/discussions/:id/minutes` | `04-minutes.png`、`04-minutes-mobile.png` |
 
@@ -55,7 +55,8 @@
 | ![大厅](docs/screenshots/01-lobby.png) | 大厅：演播厅式开场区 + 筛选/搜索 + 状态色卡片（进行中 / 待开场 / 已结束） |
 | ![发起圆桌](docs/screenshots/01-lobby-dialog.png) | 发起弹层：议题字数实时校验 + 参会人数分段选择 |
 | ![空态](docs/screenshots/01-lobby-empty.png) | 空态：筛选无结果时给「清空筛选」的下一步 |
-| ![组局](docs/screenshots/02-panel.png) | 组局：议题分析（目标 / 争议焦点 / 关注视角）+ 席位卡，含已认领席位（「你」） |
+| ![选座](docs/screenshots/02-panel-picker.png) | 选座：主持人固定 AI，4 个专家角色单选；选好后生成其余席位并开场 |
+| ![组局](docs/screenshots/02-panel.png) | 组局：议题分析（目标 / 争议焦点 / 关注视角）+ 5 张席位卡，含用户自选席位（「你」） |
 | ![现场](docs/screenshots/03-live.png) | 现场：席位栏 / 讨论流 / 行动轨迹三区独立滚动，输入区固定底部 |
 | ![纪要](docs/screenshots/04-minutes.png) | 纪要：六段结构 + 每条主张的溯源入口 + 版本徽标 |
 
@@ -89,7 +90,7 @@
 | 中文 UI | 自研文案层 `lib/copy.ts`（按钮/空态/错误/提示统一口径）+ `format.ts`（"3 分钟前"、`2026-11-17 16:32`） | 界面无英文残留、无中英混排；术语统一（议题/席位/回合/纪要） |
 | 无障碍 | 中文 `aria-label`、`aria-live="polite"` 节流播报、键盘可达 | 流式输出不刷屏；读屏用户能听清"谁在说话" |
 | 前端流式 | `fetch` + `ReadableStream` 自解析 SSE | `EventSource` 不能自定义请求头（需要 `X-Device-Id`） |
-| 测试 | JUnit 5 + MockMvc + WireMock + Playwright | WireMock 注入 LLM 故障；Playwright 跑 3 条 E2E |
+| 测试 | JUnit 5 + MockMvc + WireMock + Playwright | WireMock 注入 LLM 故障；Playwright 跑 5 条 E2E |
 | 部署/运行 | **本地原生运行，不使用 Docker**：`mvn spring-boot:run` + `pnpm dev`，或打包成单个 jar | 数据库就是 SQLite 文件，没有需要编排的服务；少一层容器 = 少一层流式代理的坑 |
 
 ### 3.3 JDK 17 带来的两个真实约束

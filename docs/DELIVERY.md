@@ -33,12 +33,12 @@
 | 要求 | 本项目落地 | 状态 |
 | --- | --- | --- |
 | 代码 + **数据库初始化脚本** | Flyway `V1__schema.sql`（7 表）/ `V2__indexes.sql` / `V3__seed_demo.sql` / `V4__seed_examples.sql` / `V5__discussion_regen_count.sql`，启动自动迁移 | ✅ 已实现 |
-| **≥5 条高质量样例数据**（预设讨论话题 + 对应嘉宾阵容） | `V3` 1 场已结束圆桌（含六段纪要）+ `V4` 5 场预设圆桌：AI 技术选型 / 定价策略 / 招聘取舍 / 内容策略 / 组织调整，每场 4 席位（1 主持 + 3 专家，立场互补） | ✅ 已实现（共 6 场） |
+| **≥5 条高质量样例数据**（预设讨论话题 + 对应嘉宾阵容） | `V3` 1 场已结束圆桌（含六段纪要）+ `V4` 5 场预设圆桌：AI 技术选型 / 定价策略 / 招聘取舍 / 内容策略 / 组织调整，每场 4 席位（历史样例；新建圆桌默认 1 主持 + 4 专家 = 5 席） | ✅ 已实现（共 6 场） |
 | **开发文档**（PRD、ER 图等，md + mermaid） | 9 份 md，含分层架构图、回合调度时序图、SSE 多路复用图、ER 图、状态机图 | ✅ 已实现 |
-| **API 文档** | springdoc-openapi → `/swagger-ui.html`；手写契约 [API.md](API.md)（18 接口 + 13 类主事件流 + 4 类组局流 + 错误码） | ✅ 已实现 |
+| **API 文档** | springdoc-openapi → `/swagger-ui.html`；手写契约 [API.md](API.md)（19 接口 + 13 类主事件流 + 4 类组局流 + 错误码） | ✅ 已实现 |
 | **测试代码** | JUnit 5 单测 + MockMvc 集成（84 例全绿，覆盖 I-1~I-15）；Playwright E2E 5 条（`pnpm -C e2e test` 约 35s，假模型驱动） | ✅ 已实现 |
 | **README** 含：运行指南 / 环境变量配置 / 技术选型说明 / API 列表 / 已完成能力与后续改进方向 | README §5 运行、`.env.example` 环境变量、§3 选型、§6 API 索引、§8 差异；「已完成 / 后续改进」见 §2.4 | ✅ 已实现 |
-| **Git 提交历史呈层级演进**（如 `docs/schema → ui-components → tests → feat: logic`） | 提交按 `docs → chore → feat(db) → feat(server) → feat(web) → test → fix` 分层推进，共 52 次（`docs/git-history.txt` 已导出） | ✅ 已实现 |
+| **Git 提交历史呈层级演进**（如 `docs/schema → ui-components → tests → feat: logic`） | 提交按 `docs → chore → feat(db) → feat(server) → feat(web) → test → fix` 分层推进，截至 2026-11-20 共 125+ 次（`docs/git-history.txt` 已导出） | ✅ 已实现 |
 
 ### 2.2 核心 Prompt 记录文档（必须 ≥5 段，四范式齐全）
 
@@ -59,7 +59,7 @@
 
 | 已完成 | 后续改进 |
 | --- | --- |
-| 圆桌大厅、组局（席位流式生成）、认领席位、多轮并行讨论、轨迹面板、观点溯源、六段纪要落库 | 多用户同场围观（presence 广播）；账号体系；纪要二次校验（引用有效性）；FTS5 trigram 搜索；单机 → 多实例（Actor 迁 Redis） |
+| 圆桌大厅、组局（五席位选座 + 其余 AI 补齐 + 自动开场）、开场前多人认领、多轮并行讨论、轨迹面板、观点溯源、六段纪要落库、参会信息与 Markdown 下载 | 同场实时 presence 广播（开场前认领已支持）；账号体系；纪要二次校验（引用有效性）；FTS5 trigram 搜索；单机 → 多实例（Actor 迁 Redis） |
 
 ---
 
@@ -74,7 +74,7 @@ ai-panel-studio/                     ← 压缩包根目录（源码与文档同
 │   ├── PRD.md  ARCHITECTURE.md  DATABASE.md  API.md
 │   ├── TESTING.md  PROJECT_PLAN.md  PROMPT_LOG.md  DELIVERY.md  WORKFLOW.md
 │   ├── assets/notice-rules.png      ← 作业要求截图（依据留档）
-│   └── screenshots/                 ← 3 张核心页面截图（列表 / 圆桌 / 纪要）
+│   └── screenshots/                 ← 4 个核心页面截图（大厅 / 组局 / 现场 / 纪要，含桌面与窄屏）
 ├── server/                          ← Spring Boot 3.5.16（含 Flyway 脚本，含 5 场样例数据）
 ├── web/                             ← Vue 3 + TS（SFC + 原生 CSS）
 ├── e2e/                             ← Playwright
@@ -100,13 +100,13 @@ zip -r ai-panel-studio.zip . -x "*/node_modules/*" "*/target/*" "data/*"
 | 时间 | 画面 | 要点 |
 | --- | --- | --- |
 | 0:00–0:20 | 标题 + 定位 | "解决的不是答案不够好，而是答案太单一" |
-| 0:20–1:00 | 大厅 → 发起 → 席位浮现 | 1 主持 + 3 专家，立场互补 |
-| 1:00–1:30 | 认领席位 → 主持人开场 | 三色区分；"我坐技术专家这位" |
+| 0:20–1:00 | 大厅 → 发起 → 选座 → 席位浮现 | 1 主持 + 4 专家，立场互补；用户先选一个专家席位 |
+| 1:00–1:30 | 生成其余 AI 席位 → 自动开场 | 三色区分；"我坐技术专家这位"；未认领席位由 AI 担任 |
 | 1:30–2:30 | 插话 → **两路同时流式** | 必拍：A 慢不挡 B；轨迹面板；引用跳转 |
 | 2:30–3:00 | Agent 协作讲解 | 立场注入 → 选人策略 → 并行 + 信号量 → 失败隔离 |
 | 3:00–3:30 | 结束 → 六段纪要 → 刷新 | 纪要可溯源、落库可复盘 |
 | 3:30–4:15 | 代码结构 | 五层分包 → SessionActor → SseRegistry → Flyway → E2E |
-| 4:15–4:40 | 收尾 | 取舍与边界（SQLite 单写者、无容器、未做多人围观） |
+| 4:15–4:40 | 收尾 | 取舍与边界（SQLite 单写者、无容器、未做同场 presence 广播） |
 
 ---
 
@@ -141,7 +141,7 @@ zip -r ai-panel-studio.zip . -x "*/node_modules/*" "*/target/*" "data/*"
 | 考察点 | 我们的应对 | 证据 |
 | --- | --- | --- |
 | 在不同阶段合理使用不同开发范式，避免大模型幻觉 | 六段推进 + 四范式（SDD/DDD/TDD/E2E）；每阶段先契约后实现，AI 输出必过测试 | WORKFLOW §2、PROMPT_LOG §4.1 |
-| 基于业务需求驱动数据建模，与 API 契约精确对应 | 7 表 + 18 接口 + SSE 13 类事件，一一映射到 FR-1~FR-9（DATABASE §8、PRD §4.5） | DATABASE、API、PRD |
+| 基于业务需求驱动数据建模，与 API 契约精确对应 | 7 表 + 19 接口 + SSE 13 类事件，一一映射到 FR-1~FR-9（DATABASE §8、PRD §4.5） | DATABASE、API、PRD |
 | 以演播厅视觉与交互驱动前端组件与状态流转 | 三色席位 + 状态点 + 消息流 + 轨迹时间线；四档响应式、区域独立滚动 | PRD §8、README §2.2 |
 | 核心逻辑遵循 TDD，含完整 E2E | 单测覆盖 SpeakerPolicy/ContextBuilder/状态机；84 例单测与集成 + 5 条 Playwright E2E | TESTING §2–§4 |
 | 考察 Prompt 结构化表达与引导 AI 解决工程问题 | 记录含"意图/挑战/修正"；7 条走偏案例（含依据版本搞错） | PROMPT_LOG §3/§5 |

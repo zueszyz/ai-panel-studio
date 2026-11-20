@@ -204,7 +204,7 @@ erDiagram
 | `topic` | TEXT | NOT NULL, `CHECK(length(topic) BETWEEN 8 AND 200)` | 用户输入的议题 |
 | `goal` | TEXT | NULL | 议题分析产出的"本场要回答的问题" |
 | `status` | TEXT | NOT NULL DEFAULT `DRAFT`, CHECK 枚举 | 见 §4.1 状态机 |
-| `panel_size` | INTEGER | NOT NULL DEFAULT 4, `CHECK 3..6` | 1 主持 + (size-1) 专家 |
+| `panel_size` | INTEGER | NOT NULL DEFAULT 4, `CHECK 3..6` | 应用创建时显式写 5（1 主持 + 4 专家）；DB 默认 4 仅为兼容旧数据与原始 SQL 插入 |
 | `turn_index` | INTEGER | NOT NULL DEFAULT 0 | 已完成回合数 |
 | `topic_analysis` | TEXT | NULL（JSON） | `{"disputes":[],"audience":[],"angles":[]}` |
 | `created_by` | TEXT | FK users, `ON DELETE SET NULL` | |
@@ -244,7 +244,7 @@ erDiagram
 | --- | --- |
 | `version` | 同一 discussion 内自增，`UNIQUE(discussion_id, version)` |
 | `content_md` | 可直接复制/导出的 Markdown |
-| `structured_json` | 六段式 JSON（TEXT），每条要点带 `sourceMessageIds`，供溯源跳转 |
+| `structured_json` | 六段式 JSON（TEXT）+ `meta`（参会席位 / 回合 / 消息数 / 时长 / 用户关切），每条要点带 `sourceMessageIds`，供溯源跳转 |
 | `status` | `GENERATING` 时前端先渲染骨架；失败保留上一版 |
 
 `structured_json` 形状：
@@ -259,9 +259,20 @@ erDiagram
                  "unresolvedBecause": "缺少冷启动数据" }],
   "consensus": ["…"],
   "hypotheses": ["若 7 日内 CTR 提升 < 3%，则方案不成立"],
-  "nextSteps": [{ "action": "…", "proposedBy": "周敏" }]
+  "nextSteps": [{ "action": "…", "proposedBy": "周敏" }],
+  "meta": {
+    "rounds": 6,
+    "seatCount": 5,
+    "messageCount": 34,
+    "durationSec": 1820,
+    "generatedAt": "2026-11-20T09:01:00.000Z",
+    "participants": ["沈知远（圆桌主持人）", "陈立（战略顾问）"],
+    "userQuestions": ["迁移成本按什么口径算？"]
+  }
 }
 ```
+
+`meta` 不交给模型生成：由服务端从本场 `agents` / `messages` / `discussions` 直接计算，避免模型编造参会人数或漏掉用户真正问过的问题。
 
 ### 3.6 `agent_runs` — Agent 运行轨迹（可观测 + 轨迹面板数据源）
 
@@ -368,7 +379,7 @@ CREATE TABLE discussions (
   goal           TEXT,
   status         TEXT NOT NULL DEFAULT 'DRAFT'
                  CHECK (status IN ('DRAFT','PANEL_READY','LIVE','SUMMARIZING','CLOSED','INTERRUPTED','FAILED')),
-  panel_size     INTEGER NOT NULL DEFAULT 4 CHECK (panel_size BETWEEN 3 AND 6),
+  panel_size     INTEGER NOT NULL DEFAULT 4 CHECK (panel_size BETWEEN 3 AND 6),  -- 应用层创建时写 5
   turn_index     INTEGER NOT NULL DEFAULT 0,
   topic_analysis TEXT,
   created_by     TEXT REFERENCES users(id) ON DELETE SET NULL,
@@ -485,7 +496,7 @@ CREATE UNIQUE INDEX ux_participant_seat           ON discussion_participants (di
 
 ### 5.5 `V3__seed_demo.sql` / `V4__seed_examples.sql` / `V5__discussion_regen_count.sql`
 
-- `V3`：1 个演示用户、1 场已结束的圆桌（4 席位 / 12 条消息 / 1 份纪要 / 8 条轨迹），保证首次打开列表不是空的，也让 E2E 有一条稳定基线。
+- `V3`：1 个演示用户、1 场已结束的圆桌（4 席位 / 12 条消息 / 1 份纪要 / 8 条轨迹），保证首次打开列表不是空的，也让 E2E 有一条稳定基线。**这是历史样例，新建圆桌默认 5 席。**
 - `V4`：5 场预设圆桌（3 场进行中 / 1 场待开场 / 1 场已结束，其中 1 场含六段纪要 + 认领记录），覆盖 AI 技术选型、定价、招聘、产品、内容五个方向，席位立场互补。
 - `V5`：为 `discussions` 增列 `regen_count`，用于「换一批」次数限制（`429 REGEN_LIMIT`）。
 
@@ -617,7 +628,7 @@ public class MinuteEntity {
 | 观点溯源（FR-6） | `messages.quote_message_id` + `minutes.structured_json.sourceMessageIds` |
 | 纪要落库可复盘（FR-7） | `minutes` 版本化 + JSON TEXT |
 | 轨迹可回放（FR-5） | `agent_runs` 按 `discussion_id` 时间线查询 |
-| 席位认领（FR-3） | `discussion_participants.seat_id` + 部分唯一索引 |
+| 席位认领（FR-3） | `discussion_participants.seat_id` + 部分唯一索引；用户选座由 `agents.status=REPLACED_BY_USER` + participant 行表达 |
 | 幂等与重试（FR-9） | `UNIQUE(discussion_id, client_msg_id)` + `messages.attempt` |
 | 并发写不炸（NFR） | WAL + 短事务 + 单条 UPDATE + busy_timeout 退避 |
 

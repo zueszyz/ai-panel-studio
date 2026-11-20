@@ -11,9 +11,9 @@
 | --- | --- | --- | --- | --- |
 | M0 文档 | 作业说明（截图留档 `docs/assets/`） | 拆需求、出 PRD/架构/ER/API/测试/计划初稿 | 9 份 md + mermaid 图 | 逐条对照作业要求打勾；每条 FR 必须有验收标准 |
 | M1 骨架 | 文档契约 | 生成 `pom.xml`、Flyway 脚本、统一异常、日志、health、Vue 骨架 | 可启动的空壳（`/api/health` 200，7 表已建） | 删库重启能自动迁移；`mvn test` 通过 |
-| M2 组局 | API 契约 + 席位字段 | 生成议题分析 prompt、席位流式接口、认领接口、大厅/组局页 | 能发起一场圆桌并认领席位 | 集成 I-1~I-4；刷新后状态保持 |
+| M2 组局 | API 契约 + 席位字段 | 生成议题分析 prompt、席位流式接口、用户选座/自动开场、开场前认领、大厅/组局页 | 能发起 5 席圆桌：自选一席，其余 AI 补齐并自动开场 | 集成 I-1~I-4；刷新后状态保持 |
 | M3 讨论 | 调度设计 | 生成 `SessionActor`、`SpeakerPolicy`、`AgentRunner`、`SseRegistry`、前端流式渲染 | 多 Agent 并行发言、轨迹面板、插话 | **E2E-2 断言"慢 agent 不阻塞快 agent"** |
-| M4 收敛 | 纪要六段结构 | 生成纪要 prompt、分段流式、版本化落库、溯源跳转 | 可复盘的纪要页 | E2E-3（刷新后仍在）+ I-8/I-9 |
+| M4 收敛 | 纪要六段结构 | 生成纪要 prompt、分段流式、版本化落库、参会信息、溯源跳转、完成态收敛 | 可复盘、可下载的纪要页 | E2E-3（刷新后仍在、徽标已结束）+ I-8/I-9 |
 | M5 质量 | 全部用例 | 生成 WireMock 桩、E2E、降级用例、README 定稿 | 可交付包 | 5 条 E2E 全绿；交付自检表 |
 
 关键纪律：**每段结束先跑验收，再进下一段**。AI 一次给太多代码时，宁可拆成"契约 → 实现 → 测试"三轮，也不一次性接收。
@@ -96,6 +96,6 @@
 | --- | --- |
 | `docs/screenshots/workflow-01-session.png` | CodeBuddy 会话与仓库结构（Agent 模式） |
 | `docs/screenshots/workflow-02-scope.png` | 任务边界 / 工具权限约定 |
-| `docs/screenshots/workflow-03-tests.png` | 测试报告（5 条 E2E 全绿） |
+| `docs/screenshots/workflow-03-tests.png` | 测试报告（84 例后端 + 5 条 E2E 全绿） |
 | `docs/screenshots/workflow-04-timeline.png` | `git log` 分层演进 |
 | `docs/screenshots/workflow-05-efficiency.png` | 本页效率台账截图 |

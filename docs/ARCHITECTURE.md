@@ -309,6 +309,22 @@ SQLite 的写操作是**全库串行**的，多 agent 同时结束消息会撞 `
 | CORS | 只允许 `WEB_ORIGIN`，不用 `*` |
 | 构建期校验 | `scripts/build` 结束后扫描 `web/dist` 是否出现 `sk-` / `apiKey`，命中即构建失败 |
 
+
+### 3.11 组局选座与收敛完成态（2026-11-20）
+
+**五席位与用户选座**
+
+- 默认席位方案为 1 位主持人 + 4 位专家；`application/UserSeatPlan` 固定专家顺序（战略顾问 / 行业分析师 / 技术专家 / 财务顾问 / 用户研究员），避免"选了技术专家却生成成财务顾问"。
+- `CreatePanelRequest` 增加 `userRole` 与 `autoStart`：服务端按角色保留一个席位作为用户席位，其余席位由 AI 生成；`PanelPersistService.replacePanel` 在**同一个事务**里写 `agents` 与 `discussion_participants`，选座与参与者记录不会只成功一半。
+- 用户席位状态为 `REPLACED_BY_USER`；`SessionActor.pickSpeakers` 过滤该状态，AI 不再替用户席位生成发言，`retryMessage` 也拒绝该席位。
+- 认领只在 `DRAFT` / `PANEL_READY` 阶段可用；讨论进入 `LIVE` 后返回 `409 ALREADY_STARTED`，避免已生成发言的说话人错位。开场时未认领的席位继续由 AI 担任。
+
+**纪要完成态**
+
+- `MinutesService` 在发送 `minutes.done` **之前**执行 `SUMMARIZING → CLOSED` 收敛，事件携带 `status`；收敛失败只记 warn，不把已落库的纪要误报为失败。
+- 前端 `minutes` store 用事件里的 `status` 更新徽标，并在读取落库版本后调用 `refreshStatus()` 与库对齐；这样不会出现"纪要已生成完、页面还显示纪要生成中"。
+- `structured.meta`（参会席位 / 回合 / 消息数 / 时长 / 用户关切）由服务端从本场数据计算，不交给模型；切换版本时前端按当前版本重置离线/错误/分节草稿。
+
 ---
 
 ## 4. 技术选型与取舍

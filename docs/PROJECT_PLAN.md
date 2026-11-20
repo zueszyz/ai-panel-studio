@@ -2,7 +2,8 @@
 
 | 项 | 内容 |
 | --- | --- |
-| 版本 | v1.1（Spring Boot 3.5.16 / JDK 17 / Vue 3 / SQLite；不使用容器） |
+| 版本 | v1.2（Spring Boot 3.5.16 / JDK 17 / Vue 3 / SQLite；不使用容器） |
+| 最近更新 | 2026-11-20：五席位选座、开场前多人加入、纪要完成态与全量文档同步 |
 | 周期 | 72 小时（作业截止） |
 | 交付 | 可运行源码 + 文档 + Git 历史（≥30 次有效提交）+ 3–5 分钟演示视频 + README |
 | 组织方式 | 文档先行 → 骨架 → 组局 → 讨论 → 收敛 → 质量 |
@@ -13,12 +14,12 @@
 
 | 阶段 | 目标 | 完成标志 | 验收方式 |
 | --- | --- | --- | --- |
-| **M0 文档**（当前） | 需求、架构、数据、契约定稿 | `docs/` 九份文档 + README；每条 FR 有验收标准；技术栈与版本明确；交付清单可勾选 | 对照评分维度自评 |
+| **M0 文档** | 需求、架构、数据、契约定稿 | `docs/` 九份文档 + README；每条 FR 有验收标准；技术栈与版本明确；交付清单可勾选 | 对照评分维度自评 |
 | **M1 骨架** | 能跑起来的空壳 | `mvn spring-boot:run` 起 8080；Flyway 建出 7 张表（SQLite 文件自动生成）；`/api/health` 200；Vue 起 5173 打通 `/api` 代理；统一异常 + JSON 日志就位 | 本机 smoke + I-1 |
-| **M2 组局** | 议题 → 席位 | 创建圆桌、流式生成席位、认领、进入圆桌；刷新可恢复 | 手动走查 + I-1~I-4 |
+| **M2 组局** | 议题 → 席位 | 创建圆桌、流式生成席位；用户先选一个专家席位，其余 AI 补位并自动开场；其他用户可在开场前认领；刷新可恢复 | 手动走查 + I-1~I-4 |
 | **M3 讨论** | 多 Agent 并行流式 | 主持人开场、回合调度、并行 delta、轨迹面板、用户插话 | E2E-1 / E2E-2 |
-| **M4 收敛** | 纪要闭环 | 结束 → 六段纪要流式 → 落 SQLite → 溯源跳转 → 导出 | E2E-3 |
-| **M5 质量** | 可交付 | 3 条 E2E 绿、降级用例绿、README 完整、视频录完、commit ≥30 | 全量回归 |
+| **M4 收敛** | 纪要闭环 | 结束 → 六段纪要流式 → 落 SQLite → 参会信息/用户关切 → 溯源跳转 → 下载 Markdown → 状态收敛 | E2E-3 |
+| **M5 质量** | 可交付 | 5 条 E2E 绿、84 例后端全绿、降级用例绿、README 完整、commit ≥30 | 全量回归 |
 
 ### 1.1 时间分配（小时）
 
@@ -26,7 +27,7 @@
 | --- | --- | --- |
 | M0 | 2.5 | 文档与契约（避免边写边改） |
 | M1 | 5 | Maven/Flyway/MyBatis-Plus 配置、Vue 骨架、日志与异常、Actuator |
-| M2 | 7 | 议题分析 prompt + 席位流式 + 认领 + 大厅/组局页 |
+| M2 | 7 | 议题分析 prompt + 席位流式 + 选座/自动开场 + 开场前认领 + 大厅/组局页 |
 | M3 | 20 | 最重：Actor、调度、并行、`SseEmitter`、前端流式渲染 |
 | M4 | 8 | 纪要生成、结构化、落库、溯源 UI |
 | M5 | 10 | E2E、降级、视觉打磨、README、录屏 |
@@ -40,68 +41,73 @@
 
 ### M1 骨架
 
-- [ ] 落地 `AGENTS.md` + `rules/`（6 份约束：项目边界 / 架构 / 前端视觉 / 接口并发 / 数据测试 / 工作流），作为后续所有 AI 会话的开工前置
-- [ ] `server/pom.xml`：Spring Boot 3.5.16 parent、`spring-boot-starter-web/validation/actuator/test`、`mybatis-plus-spring-boot3-starter`、`flyway-core`（Flyway 11 的 SQLite 方言已内含，无需也不存在 `flyway-database-sqlite`）、`sqlite-jdbc`、`springdoc-openapi-starter-webmvc-ui`、`logstash-logback-encoder`、`wiremock-standalone(test)`
-- [ ] `application.yml`（SQLite URL + Hikari + Flyway + 异步线程池 + 压缩/超时）+ `application-test.yml`
-- [ ] Flyway `V1__schema.sql`（7 表）/ `V2__indexes.sql` / `V3__seed_demo.sql`
-- [ ] `PanelStudioApplication`、`AsyncConfig`（`agentExecutor` + `MdcTaskDecorator`）、`MybatisPlusConfig`（分页 + `JacksonTypeHandler`）
-- [ ] `GlobalExceptionHandler`（`@RestControllerAdvice` → 统一错误体）、`TraceIdFilter`（`X-Device-Id` / MDC）
-- [ ] `GET /api/health`（自定义 `LlmHealthIndicator`）、`GET /api/metrics`
-- [ ] Vue：`vite.config.ts`（`/api` 代理）、路由四页占位、`styles/tokens.css`（三色 + 间距 + 字号 + 中文字体栈）、`lib/copy.ts`（中文文案表）、Pinia 初始化
-- [ ] `scripts/dev.sh` / `dev.bat` / `build.sh` / `build.bat`（**不使用 Docker**）
-- [ ] ESLint + Prettier（web）、Checkstyle（可选）、Playwright 脚手架
+- [x] 落地 `AGENTS.md` + `rules/`（6 份约束：项目边界 / 架构 / 前端视觉 / 接口并发 / 数据测试 / 工作流），作为后续所有 AI 会话的开工前置
+- [x] `server/pom.xml`：Spring Boot 3.5.16 parent、`spring-boot-starter-web/validation/actuator/test`、`mybatis-plus-spring-boot3-starter`、`flyway-core`（Flyway 11 的 SQLite 方言已内含，无需也不存在 `flyway-database-sqlite`）、`sqlite-jdbc`、`springdoc-openapi-starter-webmvc-ui`、`logstash-logback-encoder`、`wiremock-standalone(test)`
+- [x] `application.yml`（SQLite URL + Hikari + Flyway + 异步线程池 + 压缩/超时）+ `application-test.yml`
+- [x] Flyway `V1__schema.sql`（7 表）/ `V2__indexes.sql` / `V3__seed_demo.sql` / `V4__seed_examples.sql` / `V5__discussion_regen_count.sql`
+- [x] `PanelStudioApplication`、`AsyncConfig`（`agentExecutor` + `MdcTaskDecorator`）、`MybatisPlusConfig`（分页 + `JacksonTypeHandler`）
+- [x] `GlobalExceptionHandler`（`@RestControllerAdvice` → 统一错误体）、`TraceIdFilter`（`X-Device-Id` / MDC）
+- [x] `GET /api/health`（自定义 `LlmHealthIndicator`）、`GET /api/metrics`
+- [x] Vue：`vite.config.ts`（`/api` 代理）、路由四页占位、`styles/tokens.css`（三色 + 间距 + 字号 + 中文字体栈）、`lib/copy.ts`（中文文案表）、Pinia 初始化
+- [x] `scripts/dev.sh` / `dev.bat` / `build.sh` / `build.bat`（**不使用 Docker**）
+- [x] ESLint + Prettier（web）、Checkstyle（可选）、Playwright 脚手架
 
 ### M2 组局
 
-- [ ] `DiscussionController`：`POST/GET /discussions`、`GET /discussions/:id`（分页/筛选/搜索）
-- [ ] `LlmClient`：`WebClient` 流式解析（`data:` 帧）+ JSON 模式 + 首 token/总时长超时
-- [ ] 议题分析 prompt + `JsonRepair` + 结构化校验（Jackson + 手写字段校验）
-- [ ] `PanelController`：`POST /panel`（`SseEmitter` 逐席位推送）
-- [ ] 预设阵容兜底（3 套，`PresetPanels`）
-- [ ] `claim` 认领/撤销 + 部分唯一索引 + `409 SEAT_TAKEN`
-- [ ] 前端：大厅列表（骨架屏/空态/筛选/搜索）
-- [ ] 前端：组局页（议题分析 + 席位卡逐张浮现 + 换一批 + 认领）
-- [ ] 前端：席位卡组件（含颜色 token、状态点、气场文案）
+- [x] `DiscussionController`：`POST/GET /discussions`、`GET /discussions/:id`（分页/筛选/搜索）
+- [x] `LlmClient`：`WebClient` 流式解析（`data:` 帧）+ JSON 模式 + 首 token/总时长超时
+- [x] 议题分析 prompt + `JsonRepair` + 结构化校验（Jackson + 手写字段校验）
+- [x] `PanelController`：`POST /panel`（`SseEmitter` 逐席位推送）
+- [x] 预设阵容兜底（3 套，`PresetPanels`）
+- [x] `claim` 认领/撤销 + 部分唯一索引 + `409 SEAT_TAKEN`；仅筹备阶段可认领，`LIVE` 后 `409 ALREADY_STARTED`
+- [x] 前端：大厅列表（骨架屏/空态/筛选/搜索）
+- [x] 前端：组局页（议题分析 + 先选座 + 席位卡逐张浮现 + 换一批 + 认领）
+- [x] 前端：席位卡组件（含颜色 token、状态点、气场文案）
+- [x] 用户自选专家席位（`userRole`）+ 其余 AI 补位 + `autoStart` 一键开场
+- [x] 其他用户在 `DRAFT` / `PANEL_READY` 阶段认领专家席位；开场后禁止换座
 
 ### M3 讨论
 
-- [ ] `SessionActor` + `ActorRegistry`（状态、队列、inflight、`eventBuffer`、预算）
-- [ ] `SpeakerPolicy`（纯函数 + 6 个单测）
-- [ ] `TurnScheduler`（顺序决策 + `CompletableFuture` fan-out + 两级 `Semaphore`）
-- [ ] `AgentRunner`（超时 watchdog、`Disposable.dispose()`、失败落库、单条重试）
-- [ ] `ContextBuilder`（滚动摘要 + 引用装配 + 预算裁剪）
-- [ ] `SseRegistry`（emitter 注册/反注册、广播、buffer 上限、resync、心跳）
-- [ ] `GET /stream` + `Last-Event-ID` 续传 + `snapshot`
-- [ ] `POST /messages`（幂等 + 插话优先级）、`/turns`、`/start`、`/end`
-- [ ] 主持人开场 / 收束 digest prompt
-- [ ] 前端：三栏布局 + 消息气泡 + 流式打字机（rAF 合批）
-- [ ] 前端：`lib/sse.ts`（fetch + ReadableStream 解析、重连退避、`Last-Event-ID`）
-- [ ] 前端：轨迹面板（折叠技术细节）+ 席位状态点呼吸动画
-- [ ] 前端：引用徽标 + 定位高亮
+- [x] `SessionActor` + `ActorRegistry`（状态、队列、inflight、`eventBuffer`、预算）
+- [x] `SpeakerPolicy`（纯函数 + 6 个单测）
+- [x] `TurnScheduler`（顺序决策 + `CompletableFuture` fan-out + 两级 `Semaphore`）
+- [x] `AgentRunner`（超时 watchdog、`Disposable.dispose()`、失败落库、单条重试）
+- [x] `ContextBuilder`（滚动摘要 + 引用装配 + 预算裁剪）
+- [x] `SseRegistry`（emitter 注册/反注册、广播、buffer 上限、resync、心跳）
+- [x] `GET /stream` + `Last-Event-ID` 续传 + `snapshot`
+- [x] `POST /messages`（幂等 + 插话优先级）、`/turns`、`/start`、`/end`
+- [x] 主持人开场 / 收束 digest prompt
+- [x] 前端：三栏布局 + 消息气泡 + 流式打字机（rAF 合批）
+- [x] 前端：`lib/sse.ts`（fetch + ReadableStream 解析、重连退避、`Last-Event-ID`）
+- [x] 前端：轨迹面板（折叠技术细节）+ 席位状态点呼吸动画
+- [x] 前端：引用徽标 + 定位高亮
+- [x] 用户接手的席位（`REPLACED_BY_USER`）不再参与 AI 选发言人
 
 ### M4 收敛
 
-- [ ] 纪要 prompt（六段结构化 + `sourceMessageIds`）
-- [ ] 流式分段输出（`minutes.section`）
-- [ ] 落库 + 版本化 + 失败不覆盖（`keptVersion`）
-- [ ] `GET /minutes`（版本切换）
-- [ ] 前端：纪要页（目录锚点、复制 Markdown、溯源跳转）
-- [ ] 「阶段性小结」入口（讨论中生成非正式小结）
+- [x] 纪要 prompt（六段结构化 + `sourceMessageIds`）
+- [x] 流式分段输出（`minutes.section`）
+- [x] 落库 + 版本化 + 失败不覆盖（`keptVersion`）
+- [x] `GET /minutes`（版本切换）
+- [x] 前端：纪要页（目录锚点、复制 Markdown、溯源跳转）
+- [x] 「阶段性小结」入口（讨论中生成非正式小结）
+- [x] 纪要补 `structured.meta`：参会席位 / 回合 / 消息数 / 时长 / 用户关切
+- [x] 结束自动生成、下载 Markdown、`minutes.done` 携带收敛后的讨论状态
 
 ### M5 质量
 
-- [ ] WireMock 桩（流式 dribble / 慢席位 / 429 / 脏 JSON / 录制回放）
-- [ ] E2E-1/2/3 编写并通过
-- [ ] E2E-4/5 降级与断线
-- [ ] 集成 I-1~I-13（含 SQLite 并发写用例）
-- [ ] 压测脚本（20 场 × 4 agent）+ `/api/metrics` 数据写进 README
-- [ ] 视觉走查（三色区分、三档响应式、对比度、键盘可达）
-- [ ] **3 张核心页面截图**（讨论列表 / 圆桌详情 / 纪要）存 `docs/screenshots/` 并嵌入 README §2.2
+- [x] WireMock 桩（流式 dribble / 慢席位 / 429 / 脏 JSON / 录制回放）
+- [x] E2E-1~5 编写并通过
+- [x] E2E-4/5 降级与断线（失败隔离、重试、断线重连）
+- [x] 集成 I-1~I-15（含 SQLite 并发写、SSE 续传、预算、密钥边界）
+- [x] 压测脚本（20 场 × 4 agent）+ `/api/metrics` 数据写进 README
+- [x] 视觉走查（三色区分、三档响应式、对比度、键盘可达）
+- [x] **4 个核心页面截图**（大厅 / 组局 / 现场 / 纪要，含桌面与窄屏）存 `docs/screenshots/` 并嵌入 README §2.2
 - [ ] **5 张工作流程截图**（CodeBuddy 会话 / Agent 权限边界 / 目录树 / 测试报告 / 效率台账），见 [DELIVERY](DELIVERY.md) §2.3
-- [ ] README 定稿（简介 / 架构图 / 选型 / 启动 / API / 多 Agent 协作 / AI 使用 / 差异声明）
+- [x] README 定稿（简介 / 架构图 / 选型 / 启动 / API / 多 Agent 协作 / AI 使用 / 差异声明）
 - [ ] 演示视频分镜 + 录制（3–5 分钟，必含代码结构 + 核心功能 + Agent 协作三段）
-- [ ] Prompt 记录归档：五要素自检（Prompt / 产出 / 人工修改 / **验证方式** / **走偏修正**）
-- [ ] 导出提交历史 `docs/git-history.txt`，按 [DELIVERY](DELIVERY.md) §3 打包（排除 `node_modules/` `target/` `data/`）
+- [x] Prompt 记录归档：五要素自检（Prompt / 产出 / 人工修改 / **验证方式** / **走偏修正**）
+- [x] 导出提交历史 `docs/git-history.txt`，按 [DELIVERY](DELIVERY.md) §3 打包（排除 `node_modules/` `target/` `data/`）
 - [ ] 按 [DELIVERY](DELIVERY.md) §5 模板发送邮件（简历 + 作品链接 + 仓库链接 + 视频链接）
 
 ---
@@ -167,7 +173,7 @@
 | 52 | `style(web): tune contrast and responsive breakpoints` | M5 |
 | 53 | `docs: finalize readme with runbook and ai usage notes` `[me]` | M5 |
 
-> 规划 53 条，实际按开发节奏自然增量；最终以 `git log --oneline` 为准（≥30 条）。
+> 上表是初始规划（53 条）；实际按开发节奏自然增量，截至 2026-11-20 已达 **125 次提交**，超出初始规划。逐条记录以 `docs/git-history.txt` 和 `git log --oneline` 为准。
 
 ---
 
@@ -187,14 +193,14 @@
 
 ## 5. 完成定义（DoD）
 
-- [ ] `mvn -f server/pom.xml test` 全绿；`pnpm -C web build` 成功；3 条 E2E 全绿（本机，无容器）
-- [ ] `java -jar server/target/panel-studio.jar` 单进程可完整演示（含前端静态资源）
-- [ ] 19 个接口与 API 文档一致（含错误码）；Swagger UI 可访问
-- [ ] 7 张表由 Flyway 建出，纪要可从 SQLite 重新读取（重启后仍在）
-- [ ] `git log` ≥ 30 条，message 可读，提交粒度合理
-- [ ] README 含运行说明、架构图、AI 使用说明、边界声明与"不使用容器"的说明
-- [ ] 3–5 分钟视频覆盖：大厅 → 组局 → 讨论（并行流式）→ 纪要 → 代码结构讲解
-- [ ] 交付包完整：`README` + `docs/`（9 份） + `docs/git-history.txt` + 视频链接 + 版本差异说明
+- [x] `mvn -f server/pom.xml test` 84 例全绿；`pnpm -C web build` 成功；5 条 E2E 全绿（本机，无容器）
+- [x] `java -jar server/target/panel-studio.jar` 单进程可完整演示（含前端静态资源）
+- [x] 19 个接口与 API 文档一致（含错误码）；Swagger UI 可访问
+- [x] 7 张表由 Flyway 建出，纪要可从 SQLite 重新读取（重启后仍在）
+- [x] `git log` 125+ 条，message 可读，提交粒度合理
+- [x] README 含运行说明、架构图、AI 使用说明、边界声明与"不使用容器"的说明
+- [ ] 3–5 分钟视频覆盖：大厅 → 选座组局 → 讨论（并行流式）→ 纪要 → 代码结构讲解
+- [x] 交付包完整：`README` + `docs/`（9 份） + `docs/git-history.txt` + 版本差异说明；视频链接待录制后补入
 
 ---
 
@@ -202,7 +208,7 @@
 
 | 维度 | 分值 | 本项目的主要得分动作 | 投入（小时） |
 | --- | --- | --- | --- |
-| 产品完成度 | 30 | 组局 → 讨论 → 收敛闭环；认领席位；随时插话；纪要六段可溯源；"像在旁观一场圆桌" | 18 |
+| 产品完成度 | 30 | 组局 → 讨论 → 收敛闭环；选座/开场前认领；随时插话；纪要六段可溯源；"像在旁观一场圆桌" | 18 |
 | 工程化与架构 | 25 | 五层分包 + 依赖方向；`SessionActor`；Flyway；统一异常；MDC 日志；Actuator；5 条 E2E | 12 |
 | 技术深度 | 20 | 单 SSE 多路复用；并行 fan-out + 两级信号量；超时 abort；`Last-Event-ID` 续传；**多讨论隔离**；SQLite 单写者应对 | 16 |
 | 用户体验 | 15 | 三色席位 + 状态点；**三档响应式 + 区域独立滚动**；流式防抖动；全中文 UI | 8 |
@@ -212,7 +218,7 @@
 
 ---
 
-## 7. 计划项核查结果（2026-11-19）
+## 7. 计划项核查结果（截至 2026-11-20）
 
 > 对照第 2 节 WBS 与第 5 节 DoD 逐项核对代码与运行结果；下表只记录「与计划文本不一致」或「需人工交付」的项，其余按已实现处理。
 
@@ -227,8 +233,28 @@
 | M5 演示视频（3–5 分钟） | 未生成 | **待人工交付**：按 DELIVERY §5 分镜录制 |
 | M5 按 DELIVERY §5 发送邮件 | 外部动作，仓库内无法完成 | **待人工执行**：简历 + 作品 / 仓库 / 视频链接 |
 | DoD 接口数 | 计划写 18，API.md 与 Controller 实为 19 | 已回改为 19（新增软删除 / 再来一场 / 阶段性小结参数） |
-| DoD 单 jar 演示 | `scripts/build.sh` 通过，含前端静态资源 | 已验证；最近一次变更后需重新执行构建再录制 |
+| DoD 单 jar 演示 | `scripts/build.sh` 通过，含前端静态资源 | 已验证；录制前再执行一次构建 |
+| M2 组局流程（2026-11-20） | 原文写"生成席位 → 认领 → 进入圆桌"；实际改为"先选专家席位 → 生成其余 AI 席位 → 自动开场" | 计划与 PRD/API/README 已同步；其他用户可在开场前认领，开场后禁止换座 |
+| M3 人类席位（2026-11-20） | 原 `SessionActor` 只按角色过滤，认领后 AI 仍会替该席位发言 | 选发言人时排除 `REPLACED_BY_USER`；新增单测覆盖 |
+| M4 纪要（2026-11-20） | 原只有六段正文，完成态依赖前端猜测；切换版本会残留离线/错误提示 | 补 `structured.meta`、下载 Markdown、结束自动生成；后端先收敛再发 `minutes.done`，事件带 `status` |
 
 **自动化门禁**：`mvn test` 84 例全绿；`pnpm -C web build` 通过；`pnpm -C e2e test` 5 条全绿；`node scripts/stress.mjs` 20 场完成、`sqliteBusy=0`。
 
 **仍待人工**：工作流程截图、演示视频、邮件投递三项不属于代码产出，未伪造替代。
+
+
+---
+
+## 8. 2026-11-20 同步摘要
+
+本轮不是新增大功能，而是把连续几轮功能变更回写到计划与相关文档：
+
+| 主题 | 代码现状 | 文档落点 |
+| --- | --- | --- |
+| 五席位与选座 | 默认 1 主持 + 4 专家；用户选一个专家席位，其余 AI 生成后自动开场 | 本文件 §1/§2、PRD FR-2/FR-3、API §2.3、README §2 |
+| 开场前多人加入 | 大厅「筹备中」筛选；`DRAFT/PANEL_READY` 可认领；`LIVE` 后返回 `409 ALREADY_STARTED` | API §2.4、TESTING I-4、DELIVERY §2.4 |
+| 纪要完成态 | 先 `SUMMARIZING → CLOSED` 再发 `minutes.done`，事件带 `status`；前端刷新徽标并清理旧提示 | API §2.9、PROMPT_LOG R-024/F-30、TESTING I-8 |
+| 纪要增强 | `structured.meta`（参会席位/回合/时长/用户关切）、下载 Markdown、结束自动生成 | API §2.10、README §2、DELIVERY §2.4 |
+| 质量门禁 | 后端 84 例、E2E 5 条、单 jar 构建通过 | 本文件 §5/§7、README §5、DELIVERY §2.1 |
+
+**仍待人工交付**（与 §7 一致）：5 张工作流程截图、3–5 分钟演示视频、按模板发送交付邮件。
