@@ -69,7 +69,7 @@
 | **后端框架** | **Spring Boot 3.5.16** | 基于 Jakarta EE 9+，全量 `jakarta.*` 命名空间 |
 | **JDK** | **17（LTS）** | 无虚拟线程（Loom 需 21），线程模型必须显式规划 |
 | **前端框架** | **Vue 3.4** | Composition API + `<script setup>` + TypeScript；界面全中文；UI 采用单文件组件 + CSS 设计令牌实现 |
-| **数据库** | **SQLite 3.40+** | 作业要求使用 SQLite；单文件、WAL 模式、单写者 |
+| **数据库** | **SQLite 3.40+** | 原需求使用 SQLite；单文件、WAL 模式、单写者 |
 | 构建 | Maven 3.9（后端） / pnpm 8（前端） | |
 
 > UI 实现：页面按 `pages/` 划分，通用块抽到 `components/`，视觉令牌集中在 `styles/tokens.css`（三色、间距、字号、中文字体栈），主题调整只需改一处。
@@ -259,9 +259,9 @@ java -jar server/target/panel-studio.jar  # http://localhost:8080
 - 每份文档与每个模块在 commit message 中标注 `ai-gen` / `ai-gen+human-edit` / `human`。
 - **不是一句话生成**：按"文档 → 骨架 → 组局 → 讨论 → 收敛 → 质量"六段推进，每段都有独立的 Prompt 记录与人工修订；PROMPT_LOG 里能看到的是一次次纠偏（如技术栈三次变更、SQLite 单写者应对），而非一次性产出。
 
-## 8. 与作业原文的差异
+## 8. 与原需求的差异
 
-| 项 | 作业原文 | 本项目 | 理由 |
+| 项 | 原需求 | 本项目 | 理由 |
 | --- | --- | --- | --- |
 | 后端语言 | 推荐 Node.js + TypeScript | **Spring Boot 3.5.16 + JDK 17** | 推荐非强制；三个考核点与语言无关，JDK 17 无虚拟线程反而更能体现并发调度的工程判断 |
 | 数据库 | 未指定 | **SQLite 3.40+（WAL）** | 单文件、零运维、随包复现；单写者代价见 [DATABASE](docs/DATABASE.md) §1.2 |

@@ -2,11 +2,11 @@
 
 | 项 | 内容 |
 | --- | --- |
-| 依据版本 | **现行版作业说明（演播厅版）**：数据库 SQLite、前后端框架不限、交付物为「源码 + Prompt 记录 + 工作流程说明」 |
+| 依据版本 | **现行版原需求（演播厅版）**：数据库 SQLite、前后端框架不限、交付物为「源码 + Prompt 记录 + 工作流程说明」 |
 | 用途 | 把"重要规则 5 条 / 交付物 3 项"逐条落到"在哪、怎么证明" |
 | 关联 | [PRD](PRD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [DATABASE](DATABASE.md) · [API](API.md) · [TESTING](TESTING.md) · [PROMPT_LOG](PROMPT_LOG.md) · [WORKFLOW](WORKFLOW.md) |
 
-> 说明：作业说明存在多个版本（措辞差异见 §5）。本文档以**现行版**为准；旧版要求（如"≥30 次 commit"）中**不与本版冲突的部分**仍作为加分项保留。
+> 说明：原需求存在多个版本（措辞差异见 §5）。本文档以**现行版**为准；旧版要求（如"≥30 次 commit"）中**不与本版冲突的部分**仍作为加分项保留。
 
 ---
 
@@ -69,7 +69,7 @@ ai-panel-studio/                     ← 压缩包根目录（源码与文档同
 ├── docs/
 │   ├── PRD.md  ARCHITECTURE.md  DATABASE.md  API.md
 │   ├── TESTING.md  PROJECT_PLAN.md  PROMPT_LOG.md  DELIVERY.md  WORKFLOW.md
-│   ├── assets/notice-rules.png      ← 作业要求截图（依据留档）
+│   ├── assets/notice-rules.png      ← 原需求截图（依据留档）
 │   └── screenshots/                 ← 4 个核心页面截图（大厅 / 组局 / 现场 / 纪要，含桌面与窄屏）
 ├── server/                          ← Spring Boot 3.5.16（含 Flyway 脚本，含 5 场样例数据）
 ├── web/                             ← Vue 3 + TS（SFC + 原生 CSS）
@@ -84,7 +84,7 @@ zip -r ai-panel-studio.zip . -x "*/node_modules/*" "*/target/*" "data/*"
 ```
 
 - 仓库需给评审开通访问（GitHub/Gitee 邀请链接）；压缩包仅作备份，**以仓库为准**。
-- 压缩包命名：`远程作业-AI圆桌演播厅-姓名.zip`。
+- 压缩包命名：`AI圆桌演播厅-姓名.zip`。
 
 ---
 
