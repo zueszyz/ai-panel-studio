@@ -250,7 +250,7 @@ data: {"key":"claims","index":1,"md":"### 各方核心主张\n- 陈立（战略�
 event: minutes.delta
 data: {"section":"claims","text":"…"}
 event: minutes.done
-data: {"version":2,"id":"mn_9a","tokensUsed":2380}
+data: {"version":2,"id":"mn_9a","tokensUsed":2380,"status":"CLOSED"}
 event: minutes.failed
 data: {"code":"LLM_TIMEOUT","retriable":true,"keptVersion":1}
 ```
@@ -259,7 +259,7 @@ data: {"code":"LLM_TIMEOUT","retriable":true,"keptVersion":1}
 - 首帧 `minutes.section`（`topic`）不依赖模型，先推出去降低等待感；其余五段在模型返回后按顺序推送。
 - 失败**不覆盖**旧版本（`keptVersion` 告知前端仍可查看哪一版）。
 - 后端未配置模型密钥时走**离线摘要**：只从本场真实消息里摘录，`minutes.done` 带 `"fallback":"LOCAL"`，前端以「离线摘要」标注，不伪装成模型结论。
-- 生成成功即把讨论从 `SUMMARIZING` 收敛为 `CLOSED`（已是 `CLOSED` 则跳过）；`interim=true` 时不迁移状态。
+- 生成成功即把讨论从 `SUMMARIZING` 收敛为 `CLOSED`（已是 `CLOSED` 则跳过）；**先收敛再发 `minutes.done`**，事件里的 `status` 是收敛后的最终状态，前端据此同步徽标；`interim=true` 时不迁移状态。
 - `interim=true` 允许 `LIVE` / `INTERRUPTED` / `SUMMARIZING`，事件带 `interim:true`，前端以「阶段性小结」徽标标注且不作为可切换版本；`GET /minutes` 读不到阶段性小结。
 
 ### 2.10 `GET /discussions/:id/minutes?version=2`

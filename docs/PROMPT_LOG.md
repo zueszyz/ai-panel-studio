@@ -437,6 +437,26 @@
 
 ---
 
+### R-024 · 修复纪要完成后仍显示「纪要生成中」（2026-11-19 23:45–23:55）
+
+- **阶段**：M4 收敛模块的完成态一致性修复。
+- **问题**：纪要已经生成完毕、内容也已落库，但页面状态徽标仍停在「纪要生成中」；重新打开或切换版本时，「离线摘要」与错误提示也会沿用上一版的状态。
+- **根因**：
+  1. 后端先发 `minutes.done`、再执行 `closeOnSuccess`，前端收到完成事件立刻刷新时读到的还是 `SUMMARIZING`；
+  2. 前端 `minutes` store 只在初始化时读一次讨论状态，生成完成后从不刷新；
+  3. `loadMinutes` 没有重置 `offline` / `error` / 分节草稿，切换版本会继承上一版的提示。
+- **修复**：
+  1. 后端先收敛 `SUMMARIZING → CLOSED`，再把最终状态放进 `minutes.done.status`；收敛失败只记 warn，不把已落库的成功报成失败；
+  2. 前端 `onDone` 直接用事件里的 `status` 更新徽标，并在 `loadMinutes` 后调用 `refreshStatus()` 与库对齐；打开已有纪要但状态仍是 `SUMMARIZING` 时也主动自愈；
+  3. `loadMinutes` 成功时重置 `offline`（按 `model=local-fallback` 判断）、`error` 与流式分节草稿；切换版本重置复制态。
+- **验证方式（命令 + 结果）**：
+  - `mvn -f server/pom.xml -Dtest=MinutesApiIntegrationTest test` → 通过；`shouldVersionMinutes` 断言 `minutes.done` 含 `"status":"CLOSED"`，且随后 `GET /discussions/:id` 为 `CLOSED`；
+  - `pnpm -C web build` → 通过；
+  - `pnpm -C e2e test` → E2E-3 新增断言：生成完成后状态徽标必须为「已结束」。
+- **结论**：完成态在一次事件内收敛，不再依赖前端猜测或二次刷新。
+
+---
+
 ## 4. 关键决策点索引
 | # | 决策 | 结论 | 记录 | 主要影响文件 |
 | --- | --- | --- | --- | --- |
@@ -496,6 +516,7 @@
 | F-27 | 大厅 `ongoing` 混入 `PANEL_READY`，卡片直接进现场，其他用户找不到加入入口 | 筹备中的圆桌无法被其他用户认领 | 新增「筹备中」筛选；`DRAFT/PANEL_READY` 卡片进组局页并显示「可加入」 | 大厅筛选与 `openSeatCount` 接口字段 |
 | F-28 | `SessionActor` 只按角色过滤，用户接手的席位仍由 AI 发言 | 用户认领后现场出现"本人席位被 AI 代说" | 选发言人时排除 `REPLACED_BY_USER`；开场后禁止再换座 | `SessionActorTest#shouldSkipSeatClaimedByUser`；开场后认领返回 `ALREADY_STARTED` |
 | F-29 | 组局页在空席位时自动生成，用户没有机会先选自己的席位 | 无法实现"1 主持 + 4 专家里自选一席"的产品要求 | 空面板改为选座面板；用户点「生成其他席位并开始」后由服务端保留所选角色并自动开场 | E2E-1 选座流程全绿；`PanelApiIntegrationTest#shouldReserveUserSeatAndAutoStart` |
+| F-30 | 纪要 `minutes.done` 先于状态收敛发送，前端也从不刷新讨论状态；`loadMinutes` 不重置离线/错误/分节草稿 | 生成完成后徽标仍显示「纪要生成中」，切换版本会继承上一版的离线提示与错误 | 后端先收敛再发 done 并带上 `status`；前端 onDone 更新徽标 + `refreshStatus()` 自愈；`loadMinutes` 重置 `offline`/`error`/`sections` | `MinutesApiIntegrationTest#shouldVersionMinutes` 断言 CLOSED；E2E-3 断言徽标「已结束」 |
 
 ---
 
