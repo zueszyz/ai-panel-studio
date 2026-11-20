@@ -11,6 +11,11 @@ test.describe('E2E-1 选座到自动开场', () => {
     await expect(page.getByRole('heading', { level: 1 })).toContainText('把一个问题')
     await page.getByTestId('create-discussion').click()
 
+    // 反例：少于 8 字时提交按钮禁用，并显示具体原因（PRD FR-1 验收标准）
+    await page.getByTestId('topic-input').fill('短议题')
+    await expect(page.getByTestId('submit-discussion')).toBeDisabled()
+    await expect(page.getByText('议题至少 8 个字，再具体一点')).toBeVisible()
+
     await page.getByTestId('topic-input').fill('我们该不该把推荐系统从规则引擎换成向量召回')
     await expect(page.getByTestId('submit-discussion')).toBeEnabled()
     await page.getByTestId('submit-discussion').click()

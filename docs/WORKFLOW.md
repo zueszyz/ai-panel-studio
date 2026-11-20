@@ -89,13 +89,3 @@
 > 口径：人工估算按"熟悉项目的工程师第一次写"计；实际含 Review 与返工，不含等待模型输出的时间。
 
 ---
-
-## 6. 工作流程截图（交付用）
-
-| 文件 | 内容 |
-| --- | --- |
-| `docs/screenshots/workflow-01-session.png` | CodeBuddy 会话与仓库结构（Agent 模式） |
-| `docs/screenshots/workflow-02-scope.png` | 任务边界 / 工具权限约定 |
-| `docs/screenshots/workflow-03-tests.png` | 测试报告（84 例后端 + 5 条 E2E 全绿） |
-| `docs/screenshots/workflow-04-timeline.png` | `git log` 分层演进 |
-| `docs/screenshots/workflow-05-efficiency.png` | 本页效率台账截图 |

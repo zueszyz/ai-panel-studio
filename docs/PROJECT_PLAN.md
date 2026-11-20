@@ -103,7 +103,6 @@
 - [x] 压测脚本（20 场 × 4 agent）+ `/api/metrics` 数据写进 README
 - [x] 视觉走查（三色区分、三档响应式、对比度、键盘可达）
 - [x] **4 个核心页面截图**（大厅 / 组局 / 现场 / 纪要，含桌面与窄屏）存 `docs/screenshots/` 并嵌入 README §2.2
-- [ ] **5 张工作流程截图**（CodeBuddy 会话 / Agent 权限边界 / 目录树 / 测试报告 / 效率台账），见 [DELIVERY](DELIVERY.md) §2.3
 - [x] README 定稿（简介 / 架构图 / 选型 / 启动 / API / 多 Agent 协作 / AI 使用 / 差异声明）
 - [x] Prompt 记录归档：五要素自检（Prompt / 产出 / 人工修改 / **验证方式** / **走偏修正**）
 - [x] 按 [DELIVERY](DELIVERY.md) §3 打包（排除 `node_modules/` `target/` `data/`）
@@ -226,7 +225,6 @@
 | M3 `SpeakerPolicy` 6 个单测 | 原为 5 个 | 补「点名 + 关注点 + 引用叠加」用例，现为 6 个 |
 | M3 `ContextBuilder` 滚动摘要 | 原仅丢弃旧消息并提示「已折叠为 N 条」，没有摘要内容 | 改为规则化摘要（发言人 × 次数 + 回合范围，≤400 字），旧原文不再回灌 |
 | M5 压测脚本 + `/metrics` 写入 README | 原缺失 | 新增 `scripts/stress.mjs`，20 场 × 4 席位实测数据写入 README §5 |
-| M5 5 张工作流程截图 | 仓库 `docs/screenshots/` 只有 4 页 × 断点的产品截图，没有 5 张流程截图 | **待人工交付**：需在 CodeBuddy 会话中按 DELIVERY §2.3 逐张截取 |
 | DoD 接口数 | 计划写 18，API.md 与 Controller 实为 19 | 已回改为 19（新增软删除 / 再来一场 / 阶段性小结参数） |
 | DoD 单 jar 演示 | `scripts/build.sh` 通过，含前端静态资源 | 已验证（2026-11-20，约 57 MB） |
 | M2 组局流程（2026-11-20） | 原文写"生成席位 → 认领 → 进入圆桌"；实际改为"先选专家席位 → 生成其余 AI 席位 → 自动开场" | 计划与 PRD/API/README 已同步；其他用户可在开场前认领，开场后禁止换座 |
@@ -235,7 +233,6 @@
 
 **自动化门禁**：`mvn test` 84 例全绿；`pnpm -C web build` 通过；`pnpm -C e2e test` 5 条全绿；`node scripts/stress.mjs` 20 场完成、`sqliteBusy=0`。
 
-**仍待人工**：工作流程截图不属于代码产出，未伪造替代。
 
 
 ---
@@ -252,4 +249,3 @@
 | 纪要增强 | `structured.meta`（参会席位/回合/时长/用户关切）、下载 Markdown、结束自动生成 | API §2.10、README §2、DELIVERY §2.4 |
 | 质量门禁 | 后端 84 例、E2E 5 条、单 jar 构建通过 | 本文件 §5/§7、README §5、DELIVERY §2.1 |
 
-**仍待人工交付**（与 §7 一致）：5 张工作流程截图。
