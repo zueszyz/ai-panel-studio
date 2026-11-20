@@ -1,16 +1,12 @@
-# 交付与提交 · AI Panel Studio
+# 交付 · AI Panel Studio
 
 | 项 | 内容 |
 | --- | --- |
 | 依据版本 | **现行版作业说明（演播厅版）**：数据库 SQLite、前后端框架不限、交付物为「源码 + Prompt 记录 + 工作流程说明」 |
-| 用途 | 把"重要规则 5 条 / 交付物 3 项 / 提交方式"逐条落到"在哪、怎么证明" |
+| 用途 | 把"重要规则 5 条 / 交付物 3 项"逐条落到"在哪、怎么证明" |
 | 关联 | [PRD](PRD.md) · [ARCHITECTURE](ARCHITECTURE.md) · [DATABASE](DATABASE.md) · [API](API.md) · [TESTING](TESTING.md) · [PROMPT_LOG](PROMPT_LOG.md) · [WORKFLOW](WORKFLOW.md) |
-| 提交邮箱 | **xulei@wisqwest.com** |
-| 邮件主题 | **【远程作业提交】姓名** |
-| 附件 | zip 包 + 文档（Prompt 记录 + 工作流程说明）+ GitHub/Gitee 仓库邀请 |
-| 截止 | **收到作业后 72 小时** |
 
-> 说明：作业说明存在多个版本（措辞差异见 §6）。本文档以**现行版**为准；旧版要求（如"≥30 次 commit"）中**不与本版冲突的部分**仍作为加分项保留。
+> 说明：作业说明存在多个版本（措辞差异见 §5）。本文档以**现行版**为准；旧版要求（如"≥30 次 commit"）中**不与本版冲突的部分**仍作为加分项保留。
 
 ---
 
@@ -38,7 +34,7 @@
 | **API 文档** | springdoc-openapi → `/swagger-ui.html`；手写契约 [API.md](API.md)（19 接口 + 13 类主事件流 + 4 类组局流 + 错误码） | ✅ 已实现 |
 | **测试代码** | JUnit 5 单测 + MockMvc 集成（84 例全绿，覆盖 I-1~I-15）；Playwright E2E 5 条（`pnpm -C e2e test` 约 35s，假模型驱动） | ✅ 已实现 |
 | **README** 含：运行指南 / 环境变量配置 / 技术选型说明 / API 列表 / 已完成能力与后续改进方向 | README §5 运行、`.env.example` 环境变量、§3 选型、§6 API 索引、§8 差异；「已完成 / 后续改进」见 §2.4 | ✅ 已实现 |
-| **Git 提交历史呈层级演进**（如 `docs/schema → ui-components → tests → feat: logic`） | 提交按 `docs → chore → feat(db) → feat(server) → feat(web) → test → fix` 分层推进，截至 2026-11-20 共 125+ 次（`docs/git-history.txt` 已导出） | ✅ 已实现 |
+| **Git 提交历史呈层级演进**（如 `docs/schema → ui-components → tests → feat: logic`） | 提交按 `docs → chore → feat(db) → feat(server) → feat(web) → test → fix` 分层推进，截至 2026-11-20 共 125+ 次，message 可读 | ✅ 已实现 |
 
 ### 2.2 核心 Prompt 记录文档（必须 ≥5 段，四范式齐全）
 
@@ -84,7 +80,6 @@ ai-panel-studio/                     ← 压缩包根目录（源码与文档同
 ```
 
 ```bash
-git log --pretty=format:'%h %ad %s' --date=short > docs/git-history.txt
 zip -r ai-panel-studio.zip . -x "*/node_modules/*" "*/target/*" "data/*"
 ```
 
@@ -93,33 +88,7 @@ zip -r ai-panel-studio.zip . -x "*/node_modules/*" "*/target/*" "data/*"
 
 ---
 
-## 4. 提交邮件模板
-
-```text
-收件人：xulei@wisqwest.com
-主题：【远程作业提交】张三
-
-正文：
-您好，
-
-附件为「AI 圆桌演播厅 MVP」远程作业提交：
-
-1. 源码仓库：<GitHub/Gitee 链接>（已邀请访问；提交历史见 docs/git-history.txt，共 N 次）
-2. 压缩包：见附件（含代码、数据库初始化脚本、5 场样例数据、文档、测试）
-3. 核心 Prompt 记录：docs/PROMPT_LOG.md（13 段，覆盖 SDD / DDD / TDD / E2E 四范式）
-4. 工作流程说明：docs/WORKFLOW.md（1.5 页，含 3 个典型问题与效率台账）
-
-技术栈：Spring Boot 3.5.16 + JDK 17 + Vue 3 + SQLite
-
-谢谢！
-张三 / 电话 / 邮箱
-```
-
-发送前清单：仓库可访问 ☐ · zip 包 ☐ · Prompt 记录 ☐ · 工作流程说明 ☐ · 3 张截图 ☐ · 主题格式 ☐
-
----
-
-## 5. 核心考察点自检（现行说明 5 条）
+## 4. 核心考察点自检（现行说明 5 条）
 
 | 考察点 | 我们的应对 | 证据 |
 | --- | --- | --- |
@@ -132,17 +101,16 @@ zip -r ai-panel-studio.zip . -x "*/node_modules/*" "*/target/*" "data/*"
 
 ---
 
-## 6. 版本差异核对（避免拿错依据）
+## 5. 版本差异核对（避免拿错依据）
 
 | 项 | 旧版说明 | 现行版说明 | 本项目执行 |
 | --- | --- | --- | --- |
 | 数据库 | 未指定 | **SQLite** | SQLite ✅ |
 | 交付物 | 11 项（含 ≥30 commit、≥3 E2E） | 3 项（源码+文档 / Prompt 记录 ≥5 段 / 工作流程说明） | 以本版为主，旧版数量要求作为加分项超额完成（7 表/19 API/125+ commit） |
-| 提交 | handshake@gaodun.cn，主题【AI开发实习生-姓名-岗位】 | **xulei@wisqwest.com**，主题【远程作业提交】姓名 | 按现行版 |
 
 ---
 
-## 7. 交付前 24 小时检查表
+## 6. 交付前 24 小时检查表
 
 - [ ] 删 `data/panel-studio.db` 重启能自动建库 + 5 场样例数据（证明初始化脚本与数据质量）
 - [ ] `/swagger-ui.html` 可访问，endpoint 数量与 API.md 一致（19）
@@ -152,6 +120,5 @@ zip -r ai-panel-studio.zip . -x "*/node_modules/*" "*/target/*" "data/*"
 - [ ] WORKFLOW.md 1–1.5 页，含 3 个典型问题与效率台账
 - [ ] README「已完成能力 / 后续改进方向」两节齐全
 - [ ] `git log` 呈层级（docs → feat(db) → feat(server) → feat(web) → test），无"更新/修改"
-- [ ] `docs/git-history.txt` 已导出；仓库已邀请评审
+- [ ] 仓库已邀请评审
 - [ ] zip 不含 `node_modules/` `target/` `data/`
-- [ ] 邮件主题、收件人、附件无误；链接可匿名访问

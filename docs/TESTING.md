@@ -180,5 +180,4 @@ pnpm -C e2e test
 - [ ] `pnpm -C e2e test` 全绿（5 条，约 35s）
 - [ ] 删除 `data/panel-studio.db` 后重启，Flyway 三个脚本自动建库并 seed 成功（证明"数据库初始化脚本"可交付）
 - [ ] `/swagger-ui.html` 可访问，接口数量与 [API](API.md) §1 一致（19 个）
-- [ ] `git log --oneline | wc -l` ≥ 30，且 `docs/git-history.txt` 已导出
 - [ ] 压缩包不包含 `node_modules/`、`server/target/`、`data/`

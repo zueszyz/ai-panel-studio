@@ -464,7 +464,7 @@ sequenceDiagram
 | M5 质量 | 5 条 E2E、降级用例、README/架构图/API 文档定稿 |
 
 交付物：源码（含 Git 历史 ≥ 30 次提交）+ 文档 + README（运行 / 架构 / AI 使用说明）。
-交付清单、压缩包结构、邮件模板与评分维度自检见 [DELIVERY.md](DELIVERY.md)。
+交付清单、压缩包结构与评分维度自检见 [DELIVERY.md](DELIVERY.md)。
 
 ---
 
