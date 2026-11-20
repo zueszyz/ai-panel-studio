@@ -10,6 +10,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.autoconfigure.web.servlet.MockMvcPrint;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
@@ -40,7 +41,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 六段分节到达、版本自增、失败不覆盖旧版本、未结束不能出正式纪要。
  */
 @SpringBootTest
-@AutoConfigureMockMvc
+// SSE 响应由异步线程写回，MockMvc 默认的 response 打印会边写边遍历 header，
+// 在快速完成时偶发 ConcurrentModificationException；这里只关打印，不影响断言。
+@AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 @ActiveProfiles("test")
 class MinutesApiIntegrationTest {
 
@@ -105,7 +108,12 @@ class MinutesApiIntegrationTest {
         String firstStream = generateMinutes(discussionId, "event:minutes.done");
         assertThat(firstStream)
                 .withFailMessage("第一次生成没完成，流内容：%s", firstStream)
-                .contains("event:minutes.section").contains("event:minutes.done");
+                .contains("event:minutes.section").contains("event:minutes.done")
+                // 完成事件必须已经带上收敛后的状态，前端不能再停留在「纪要生成中」
+                .contains("\"status\":\"CLOSED\"");
+        mockMvc.perform(get("/api/discussions/" + discussionId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CLOSED"));
 
         JsonNode first = fetchMinutes(discussionId, null);
         assertThat(first.path("version").asInt()).isEqualTo(1);

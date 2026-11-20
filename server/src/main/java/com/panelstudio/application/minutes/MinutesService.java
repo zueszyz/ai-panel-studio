@@ -209,11 +209,19 @@ public class MinutesService {
                 send(emitter, "minutes.section", new SectionEvent(key, index, sections.get(key), interim));
                 index++;
             }
-            send(emitter, "minutes.done", new DoneEvent(minuteId, version, tokens,
-                    local ? "LOCAL" : null, interim));
+            // 先收敛再报完成：否则前端收到 done 后立刻刷新，会读到还没迁到 CLOSED 的旧状态。
+            DiscussionStatus finalStatus = discussion.getStatus();
             if (!interim) {
-                closeOnSuccess(discussionId);
+                try {
+                    closeOnSuccess(discussionId);
+                    finalStatus = discussionService.requireDiscussion(discussionId).getStatus();
+                } catch (RuntimeException ex) {
+                    // 纪要已经落库，收敛失败只影响状态徽标，不能因此把成功报成失败。
+                    log.warn("纪要已落库，但讨论状态收敛失败 discussionId={}", discussionId, ex);
+                }
             }
+            send(emitter, "minutes.done", new DoneEvent(minuteId, version, tokens,
+                    local ? "LOCAL" : null, interim, finalStatus));
             emitter.complete();
             log.info("minutes.done discussionId={} version={} local={} interim={}",
                     discussionId, version, local, interim);
