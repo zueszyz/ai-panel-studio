@@ -178,6 +178,6 @@ pnpm -C e2e test
 
 - [ ] `mvn -f server/pom.xml test` 全绿（单元 + 集成 84 条，含 SQLite 并发写）
 - [ ] `pnpm -C e2e test` 全绿（5 条，约 35s）
-- [ ] 删除 `data/panel-studio.db` 后重启，Flyway 三个脚本自动建库并 seed 成功（证明"数据库初始化脚本"可交付）
+- [x] 删除 `data/panel-studio.db` 后重启，Flyway `V1~V5` 自动建库并 seed 成功（本次核查：7 张业务表、6 场样例）
 - [ ] `/swagger-ui.html` 可访问，接口数量与 [API](API.md) §1 一致（19 个）
 - [ ] 压缩包不包含 `node_modules/`、`server/target/`、`data/`

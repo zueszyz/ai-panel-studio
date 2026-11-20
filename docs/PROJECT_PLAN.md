@@ -171,7 +171,7 @@
 | 52 | `style(web): tune contrast and responsive breakpoints` | M5 |
 | 53 | `docs: finalize readme with runbook and ai usage notes` `[me]` | M5 |
 
-> 上表是初始规划（53 条）；实际按开发节奏自然增量，截至 2026-11-20 已达 **125 次提交**，超出初始规划。逐条记录以 `git log --oneline` 为准。
+> 上表是初始规划（53 条）；实际按开发节奏自然增量，截至 2026-11-20 已达 **130+ 次提交**，超出初始规划。逐条记录以 `git log --oneline` 为准。
 
 ---
 
@@ -195,7 +195,7 @@
 - [x] `java -jar server/target/panel-studio.jar` 单进程可完整演示（含前端静态资源）
 - [x] 19 个接口与 API 文档一致（含错误码）；Swagger UI 可访问
 - [x] 7 张表由 Flyway 建出，纪要可从 SQLite 重新读取（重启后仍在）
-- [x] `git log` 125+ 条，message 可读，提交粒度合理
+- [x] `git log` 130+ 条，message 可读，提交粒度合理
 - [x] README 含运行说明、架构图、AI 使用说明、边界声明与"不使用容器"的说明
 - [x] 交付包完整：`README` + `docs/`（9 份） + 版本差异说明
 
@@ -228,7 +228,7 @@
 | M5 压测脚本 + `/metrics` 写入 README | 原缺失 | 新增 `scripts/stress.mjs`，20 场 × 4 席位实测数据写入 README §5 |
 | M5 5 张工作流程截图 | 仓库 `docs/screenshots/` 只有 4 页 × 断点的产品截图，没有 5 张流程截图 | **待人工交付**：需在 CodeBuddy 会话中按 DELIVERY §2.3 逐张截取 |
 | DoD 接口数 | 计划写 18，API.md 与 Controller 实为 19 | 已回改为 19（新增软删除 / 再来一场 / 阶段性小结参数） |
-| DoD 单 jar 演示 | `scripts/build.sh` 通过，含前端静态资源 | 已验证；交付前再执行一次构建 |
+| DoD 单 jar 演示 | `scripts/build.sh` 通过，含前端静态资源 | 已验证（2026-11-20，约 57 MB） |
 | M2 组局流程（2026-11-20） | 原文写"生成席位 → 认领 → 进入圆桌"；实际改为"先选专家席位 → 生成其余 AI 席位 → 自动开场" | 计划与 PRD/API/README 已同步；其他用户可在开场前认领，开场后禁止换座 |
 | M3 人类席位（2026-11-20） | 原 `SessionActor` 只按角色过滤，认领后 AI 仍会替该席位发言 | 选发言人时排除 `REPLACED_BY_USER`；新增单测覆盖 |
 | M4 纪要（2026-11-20） | 原只有六段正文，完成态依赖前端猜测；切换版本会残留离线/错误提示 | 补 `structured.meta`、下载 Markdown、结束自动生成；后端先收敛再发 `minutes.done`，事件带 `status` |
