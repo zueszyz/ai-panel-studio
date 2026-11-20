@@ -288,6 +288,8 @@ export interface MinuteDoneEvent {
   tokensUsed: number
   fallback?: 'LOCAL' | null
   interim?: boolean
+  /** 后端在报完成前已收敛讨论状态；正式纪要为 CLOSED */
+  status?: DiscussionStatus
 }
 
 export interface MinuteFailedEvent {

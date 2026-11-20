@@ -11,7 +11,11 @@ const dotStyle = computed(() => ({ '--dot-color': statusDotColor(props.status) }
 </script>
 
 <template>
-  <span class="badge status-badge" :class="`status-badge--${status.toLowerCase()}`">
+  <span
+    class="badge status-badge"
+    :class="`status-badge--${status.toLowerCase()}`"
+    data-testid="status-badge"
+  >
     <span class="dot" :style="dotStyle" aria-hidden="true"></span>
     {{ label }}
   </span>

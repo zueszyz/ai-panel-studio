@@ -56,8 +56,26 @@ export const useMinutesStore = defineStore('minutes', () => {
     }
     await loadMinutes()
     loading.value = false
+    // 纪要已存在但讨论还停在"生成中"：说明上一次收敛没写回，主动对齐一次状态。
+    if (view.value && status.value === 'SUMMARIZING') {
+      await refreshStatus()
+    }
     if (auto && notFound.value && canGenerate.value) {
       await generate()
+    }
+  }
+
+  /** 以服务端为准刷新讨论状态；失败时保留事件里带的最终状态。 */
+  async function refreshStatus(): Promise<void> {
+    if (!discussionId.value) {
+      return
+    }
+    try {
+      const detail = await fetchDiscussion(discussionId.value)
+      topic.value = detail.topic
+      status.value = detail.status
+    } catch {
+      // 状态刷新失败不影响已生成的纪要，保留当前值
     }
   }
 
@@ -70,6 +88,10 @@ export const useMinutesStore = defineStore('minutes', () => {
       view.value = data
       selectedVersion.value = data.version
       notFound.value = false
+      // 版本切换/刷新后，徽标与提示都以当前版本为准，避免沿用上一版的"离线""生成中"状态。
+      error.value = null
+      offline.value = data.model === 'local-fallback'
+      sections.value = {}
     } catch (err) {
       if (err instanceof ApiError && err.code === 'MINUTES_NOT_FOUND') {
         view.value = null
@@ -82,6 +104,7 @@ export const useMinutesStore = defineStore('minutes', () => {
 
   async function selectVersion(version: number): Promise<void> {
     interim.value = false
+    copied.value = false
     await loadMinutes(version)
   }
 
@@ -111,6 +134,10 @@ export const useMinutesStore = defineStore('minutes', () => {
             if (payload.interim !== undefined) {
               interim.value = payload.interim
             }
+            // 正式纪要的 done 已带最终状态（CLOSED）：先落徽标，再异步对齐库里的状态。
+            if (!interim.value && payload.status) {
+              status.value = payload.status
+            }
           },
           onFailed: (payload) => {
             error.value = payload.keptVersion
@@ -121,14 +148,17 @@ export const useMinutesStore = defineStore('minutes', () => {
         controller.signal,
         status.value === 'LIVE',
       )
-      // 阶段性小结没有落库版本，不重新拉取；正式纪要才以数据库为准刷新。
-      if (!interim.value) {
-        await loadMinutes()
-      }
     } catch (err) {
       error.value = err instanceof ApiError ? errorMessage(err.code, err.message) : copy.errors.network
+      return
     } finally {
+      // 流一结束就摘掉「正在整理纪要」：后续读库/对齐状态不应继续显示生成中。
       generating.value = false
+    }
+    // 阶段性小结没有落库版本，不重新拉取；正式纪要才以数据库为准刷新。
+    if (!interim.value) {
+      await loadMinutes()
+      await refreshStatus()
     }
   }
 
@@ -187,6 +217,7 @@ export const useMinutesStore = defineStore('minutes', () => {
     hasSections,
     versions,
     init,
+    refreshStatus,
     selectVersion,
     generate,
     copyMarkdown,

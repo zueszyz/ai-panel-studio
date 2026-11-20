@@ -15,6 +15,9 @@ test.describe('E2E-3 纪要收敛', () => {
     const content = page.getByTestId('minutes-content')
     await expect(content).toBeVisible({ timeout: 45_000 })
 
+    // 生成完毕后状态徽标必须从「纪要生成中」收敛为「已结束」，不能停留在中间态
+    await expect(page.getByTestId('status-badge')).toContainText('已结束')
+
     // 1) 六段齐全
     const blocks = content.locator('.block')
     await expect(blocks).toHaveCount(6)
