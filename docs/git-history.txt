@@ -1,3 +1,6 @@
+2f618b3 2026-11-20 docs: remove demo-recording deliverables from the delivery scope
+a784c5b 2026-11-20 docs(prompt-log): complete M3-M5 records and tool-call trail
+6b670dd 2026-11-20 docs: refresh git history export after plan sync
 cb54a9d 2026-11-20 docs(screenshots): refresh product screenshots for seat picking and minutes facts
 4bb339a 2026-11-20 docs: sync the plan and related docs with the current implementation
 62066cb 2026-11-20 docs: refresh git history export after minutes status fix
