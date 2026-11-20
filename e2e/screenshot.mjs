@@ -83,26 +83,33 @@ for (const point of breakpoints) {
   await context.close()
 }
 
-// 组局：自建一场圆桌 → 预设阵容生成 → 认领一个席位 → 截图
+// 组局：先截一张空面板的选座页，再自建一场 5 席圆桌并保留用户席位
 const api = await desktop.request
 const headers = { 'X-Device-Id': deviceId }
+const picker = await api.post(`${base}/api/discussions`, {
+  headers,
+  data: { topic: '把年度订阅改成按量计费，是不是自欺欺人', panelSize: 5 },
+})
+const pickerDiscussion = await picker.json()
+
+await shoot(
+  desktop,
+  '02-panel-picker',
+  async (page) => {
+    await page.waitForSelector('[data-testid="seat-picker"]')
+  },
+  `/discussions/${pickerDiscussion.id}/panel`,
+)
+
 const created = await api.post(`${base}/api/discussions`, {
   headers,
-  data: { topic: '把年度订阅改成按量计费，是不是自欺欺人', panelSize: 4 },
+  data: { topic: '把年度订阅改成按量计费，是不是自欺欺人', panelSize: 5 },
 })
 const discussion = await created.json()
 await api.post(`${base}/api/discussions/${discussion.id}/panel`, {
   headers,
-  data: { regenerate: false, preset: true },
+  data: { regenerate: false, preset: true, userRole: 'TECH', autoStart: false },
 })
-const panel = await (await api.get(`${base}/api/discussions/${discussion.id}/panel`, { headers })).json()
-const seat = panel.seats.find((item) => item.roleType !== 'HOST')
-if (seat) {
-  await api.post(`${base}/api/discussions/${discussion.id}/claim`, {
-    headers,
-    data: { seatId: seat.id },
-  })
-}
 
 await shoot(
   desktop,
@@ -147,31 +154,46 @@ await shoot(
   'domcontentloaded',
 )
 
-// 纪要：挑一场已有纪要的已结束圆桌（种子数据里必有）
-const closed = await (
-  await api.get(`${base}/api/discussions?status=CLOSED&limit=5`, { headers })
-).json()
-for (const item of closed.items ?? []) {
-  const response = await api.get(`${base}/api/discussions/${item.id}/minutes`, { headers })
-  if (response.ok()) {
-    await shoot(
-      desktop,
-      '04-minutes',
-      async (page) => {
-        await page.waitForSelector('[data-testid="minutes-content"]')
-      },
-      `/discussions/${item.id}/minutes`,
-    )
-    await shoot(
-      mobile,
-      '04-minutes-mobile',
-      async (page) => {
-        await page.waitForSelector('[data-testid="minutes-content"]')
-      },
-      `/discussions/${item.id}/minutes`,
-    )
+// 纪要：在当前这场里发一条用户关切，结束后现场生成，截图会带上参会事实
+await api.post(`${base}/api/discussions/${discussion.id}/messages`, {
+  headers,
+  data: { content: '续费口径变化时，老客户怎么沟通？', clientMsgId: `shot-${Date.now()}` },
+})
+for (let attempt = 0; attempt < 100; attempt++) {
+  const runs = await (await api.get(`${base}/api/discussions/${discussion.id}/runs`, { headers })).json()
+  const items = runs.items ?? []
+  const busy = items.some((item) => !['DONE', 'FAILED'].includes(item.phase ?? ''))
+  const replied = items.some(
+    (item) => item.trigger === 'USER_INTERRUPT' && ['DONE', 'FAILED'].includes(item.phase ?? ''),
+  )
+  if (!busy && replied) {
     break
   }
+  await new Promise((done) => setTimeout(done, 200))
 }
+await api.post(`${base}/api/discussions/${discussion.id}/end`, { headers, data: {} })
+await api.post(`${base}/api/discussions/${discussion.id}/minutes`, {
+  headers: { ...headers, Accept: 'text/event-stream, application/json' },
+  timeout: 60_000,
+})
+
+await shoot(
+  desktop,
+  '04-minutes',
+  async (page) => {
+    await page.waitForSelector('[data-testid="minutes-content"]')
+    await page.waitForSelector('[data-testid="minutes-facts"]')
+  },
+  `/discussions/${discussion.id}/minutes`,
+)
+
+await shoot(
+  mobile,
+  '04-minutes-mobile',
+  async (page) => {
+    await page.waitForSelector('[data-testid="minutes-content"]')
+  },
+  `/discussions/${discussion.id}/minutes`,
+)
 
 await browser.close()
