@@ -544,7 +544,8 @@
 - **Prompt（摘要）**：> 将整个项目上传到 GitHub；若没有对应仓库则创建；上传完毕后整理并压缩交付内容。
 - **产出**：
   - 仓库 `https://github.com/zueszyz/ai-panel-studio`（public，默认分支 `main`），本地 135+ 次提交全部推送，`origin/main` 与工作区同步；
-  - 交付包 `D:\rep\delivery\AI圆桌演播厅.zip`（约 8.11 MB，1614 条目），含 `.git` 历史、全部源码/文档/测试/截图。
+  - 交付包 `D:\rep\delivery\AI圆桌演播厅.zip`（约 8 MB，1600+ 条目），含 `.git` 历史、全部源码/文档/测试/截图。
+  - 演示库 `data/panel-studio.db` 解除忽略后上传并补入交付包（已 checkpoint，无 WAL 旁文件）。
 - **工具调用记录**：
   - `gh repo create ai-panel-studio --public --source=. --remote=origin --push`；
   - `git ls-files` 收集受控文件 + Python `zipfile` 写入归档；

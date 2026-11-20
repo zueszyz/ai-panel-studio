@@ -29,6 +29,7 @@
 | 要求 | 本项目落地 | 状态 |
 | --- | --- | --- |
 | 代码 + **数据库初始化脚本** | Flyway `V1__schema.sql`（7 表）/ `V2__indexes.sql` / `V3__seed_demo.sql` / `V4__seed_examples.sql` / `V5__discussion_regen_count.sql`，启动自动迁移 | ✅ 已实现 |
+| **演示数据库** | `data/panel-studio.db`（已 checkpoint、无 WAL 旁文件）：13 场 discussion / 116 条消息 / 5 份纪要 / 92 条轨迹，随仓库与交付包提供 | ✅ 已实现 |
 | **≥5 条高质量样例数据**（预设讨论话题 + 对应嘉宾阵容） | `V3` 1 场已结束圆桌（含六段纪要）+ `V4` 5 场预设圆桌：AI 技术选型 / 定价策略 / 招聘取舍 / 内容策略 / 组织调整，每场 4 席位（历史样例；新建圆桌默认 1 主持 + 4 专家 = 5 席） | ✅ 已实现（共 6 场） |
 | **开发文档**（PRD、ER 图等，md + mermaid） | 9 份 md，含分层架构图、回合调度时序图、SSE 多路复用图、ER 图、状态机图 | ✅ 已实现 |
 | **API 文档** | springdoc-openapi → `/swagger-ui.html`；手写契约 [API.md](API.md)（19 接口 + 13 类主事件流 + 4 类组局流 + 错误码） | ✅ 已实现 |
@@ -76,12 +77,14 @@ ai-panel-studio/                     ← 压缩包根目录（源码与文档同
 ├── web/                             ← Vue 3 + TS（SFC + 原生 CSS）
 ├── e2e/                             ← Playwright
 ├── scripts/                         ← dev / build（无容器）
+├── data/                            ← 演示库 panel-studio.db（其余运行时数据忽略）
 ├── .env.example
 └── .git/
 ```
 
 ```bash
 zip -r ai-panel-studio.zip . -x "*/node_modules/*" "*/target/*" "data/*"
+zip -u ai-panel-studio.zip data/panel-studio.db   # 演示库单独补入归档
 ```
 
 - 仓库需给评审开通访问（GitHub/Gitee 邀请链接）；压缩包仅作备份，**以仓库为准**。
@@ -142,7 +145,10 @@ zip -r ai-panel-studio.zip . -x "*/node_modules/*" "*/target/*" "data/*"
 
 
 | 9 | GitHub 上传 | `gh repo create ... --source=. --remote=origin --push` | 仓库 `https://github.com/zueszyz/ai-panel-studio` 已创建，135+ 次提交全部推送，`main...origin/main` 同步 |
-| 10 | 交付包 | Python `zipfile` 打包 + 完整性抽检 | `D:\rep\delivery\AI圆桌演播厅.zip`，8.11 MB / 1614 条目，关键文件齐全，排除项抽检通过 |
+| 10 | 交付包 | Python `zipfile` 打包 + 完整性抽检 | `D:\rep\delivery\AI圆桌演播厅.zip`，约 8 MB / 1600+ 条目，关键文件齐全，排除项抽检通过 |
 
+
+| 11 | 演示数据库 | `git add data/panel-studio.db` + zip 补入 | 数据库已解除忽略并上传；已 checkpoint（无 `-wal`/`-shm`），随交付包提供，13 discussions / 116 messages / 5 minutes |
 
 **结论**：代码、测试、单 jar、初始化脚本、OpenAPI、截图、文档、GitHub 仓库与交付 zip 均已完成核查。仓库为 public，无需单独邀请；两项原定人工动作（仓库授权、zip 抽检）已由公开链接与归档抽检关闭。
+

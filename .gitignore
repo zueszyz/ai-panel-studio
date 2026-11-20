@@ -15,14 +15,18 @@ server/target/
 .env.*
 !.env.example
 
-# runtime data
+# runtime data（演示库随仓库交付，其余运行时数据继续忽略）
 data/
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
 *.sqlite
 *.sqlite3
 logs/
 *.log
+!data/
+!data/panel-studio.db
 
 # test artifacts
 coverage/

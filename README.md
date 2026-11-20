@@ -233,7 +233,7 @@ java -jar server/target/panel-studio.jar  # http://localhost:8080
 
 > **零密钥也能完整演示**：未配置外部模型时自动启用内置离线模型，组局、并行发言、收束、纪要都能跑通并落库；`/api/health` 的 `llm` 返回 `local`。配置 `LLM_*` 后自动切换为真实模型，返回 `up`。
 
-`application.yml` 已配置 SQLite 连接参数（WAL / `busy_timeout` / `foreign_keys`），无需手工建库 —— 首次启动会在 `data/panel-studio.db` 自动建表并写入演示数据。备份：`sqlite3 data/panel-studio.db "VACUUM INTO 'data/backup.db'"`。
+`application.yml` 已配置 SQLite 连接参数（WAL / `busy_timeout` / `foreign_keys`），无需手工建库 —— 首次启动会在 `data/panel-studio.db` 自动建表并写入演示数据。仓库随附同一演示库（已 checkpoint，无 WAL 旁文件），可直接启动查看；备份：`sqlite3 data/panel-studio.db "VACUUM INTO 'data/backup.db'"`。
 
 ## 6. 文档索引
 
@@ -270,6 +270,7 @@ java -jar server/target/panel-studio.jar  # http://localhost:8080
 
 ## 9. 交付
 
+- 演示数据库：`data/panel-studio.db`（随仓库与交付包提供，含 13 场讨论、116 条消息、5 份纪要）。
 - 仓库地址：`https://github.com/zueszyz/ai-panel-studio`（public，`main` 分支含完整提交历史）。
 - 必交清单（11 项）逐条对照、压缩包结构、**评分维度自检**：见 [docs/DELIVERY.md](docs/DELIVERY.md)。
 
